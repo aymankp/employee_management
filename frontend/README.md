@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
@@ -69,7 +68,3 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-=======
-# employee-management
-employee management is simply how a company tracks and handles employee leaves like sick leave, casual leave, or vacations. It makes sure employees can take time off smoothly while the organization still runs without chaos.
->>>>>>> f4e6f64e1077a432cbd0893fdd83280cae985eee
