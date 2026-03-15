@@ -36,6 +36,10 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
+
+// ===== FILE ACCESS ROUTES (TOP PE RAKHO) =====
+router.get("/file/view/:id", protect, documentController.viewDocument);
+router.get("/file/download/:id", protect, documentController.downloadDocument);
 // ========== EMPLOYEE ROUTES ==========
 router.post('/upload', 
   protect, 
@@ -89,5 +93,7 @@ router.put('/:id/verify',
   isAdmin, 
   documentController.verifyDocument
 );
+
+
 
 module.exports = router;

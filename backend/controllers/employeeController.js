@@ -122,36 +122,41 @@ const getEmployeeDirectory = async (req, res) => {
 // @desc    Get single employee by ID
 // @route   GET /api/employees/:id
 // @access  Manager/Admin
+// FIXED: Changed from export const to const
 const getEmployeeById = async (req, res) => {
   try {
-    const employee = await User.findById(req.params.id)
-      .populate('employmentDetails.department', 'name code head')
-      .populate('employmentDetails.reportingTo', 'name email')
-      .populate('createdBy', 'name email')
-      .select('-password');
+    const { id } = req.params;
+    
+    // Check if id is a valid ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid employee ID format" 
+      });
+    }
+
+    const employee = await User.findById(id)
+      .select('-password')
+      .populate('employmentDetails.department', 'name code')
+      .populate('employmentDetails.reportingTo', 'name email');
 
     if (!employee) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        message: 'Employee not found'
+        message: "Employee not found" 
       });
     }
 
-    // Check if manager can view this employee
-    if (req.user.role === 'manager' && employee.team !== req.user.team) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only view employees in your team'
-      });
-    }
-
-    res.json({
+    res.json({ 
       success: true,
-      employee
+      employee 
     });
   } catch (error) {
-    console.error('Get employee error:', error);
-    res.status(500).json({ message: error.message });
+    console.error("Get employee error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error" 
+    });
   }
 };
 
@@ -206,10 +211,16 @@ const updateEmployee = async (req, res) => {
     employee.updatedBy = req.user._id;
     await employee.save();
 
+    // Get updated employee without password
+    const updatedEmployee = await User.findById(employee._id)
+      .select('-password')
+      .populate('employmentDetails.department', 'name code')
+      .populate('employmentDetails.reportingTo', 'name email');
+
     res.json({
       success: true,
       message: 'Employee updated successfully',
-      employee: employee.select('-password')
+      employee: updatedEmployee
     });
   } catch (error) {
     console.error('Update employee error:', error);
@@ -296,6 +307,7 @@ const getEmployeeStats = async (req, res) => {
   }
 };
 
+// Export all functions using CommonJS syntax
 module.exports = {
   getMyProfile,
   updateMyProfile,

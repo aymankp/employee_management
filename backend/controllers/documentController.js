@@ -9,16 +9,16 @@ const fs = require('fs');
 // @access  Private
 const uploadDocument = async (req, res) => {
   try {
-    const { 
-      category, 
-      documentType, 
-      title, 
-      description, 
-      documentNumber, 
-      issuedBy, 
-      issuedDate, 
+    const {
+      category,
+      documentType,
+      title,
+      description,
+      documentNumber,
+      issuedBy,
+      issuedDate,
       expiryDate,
-      isConfidential 
+      isConfidential
     } = req.body;
 
     if (!req.file) {
@@ -80,11 +80,11 @@ const getMyDocuments = async (req, res) => {
   try {
     const { category, documentType, verificationStatus } = req.query;
 
-    const filter = { 
+    const filter = {
       employee: req.user._id,
-      isActive: true 
+      isActive: true
     };
-    
+
     if (category) filter.category = category;
     if (documentType) filter.documentType = documentType;
     if (verificationStatus) filter.verificationStatus = verificationStatus;
@@ -135,11 +135,11 @@ const getEmployeeDocuments = async (req, res) => {
       }
     }
 
-    const filter = { 
+    const filter = {
       employee: employeeId,
-      isActive: true 
+      isActive: true
     };
-    
+
     if (category) filter.category = category;
     if (verificationStatus) filter.verificationStatus = verificationStatus;
 
@@ -193,7 +193,7 @@ const verifyDocument = async (req, res) => {
     document.verificationStatus = status;
     document.verifiedBy = req.user._id;
     document.verifiedAt = new Date();
-    
+
     if (status === 'rejected') {
       document.rejectionReason = notes || 'Document rejected';
     } else {
@@ -271,11 +271,11 @@ const getDocumentRequests = async (req, res) => {
   try {
     const { status } = req.query;
 
-    const filter = { 
+    const filter = {
       employee: req.user._id,
-      isActive: true 
+      isActive: true
     };
-    
+
     if (status) filter.status = status;
 
     const requests = await DocumentRequest.find(filter)
@@ -414,8 +414,8 @@ const getExpiringDocuments = async (req, res) => {
     expiryThreshold.setDate(expiryThreshold.getDate() + parseInt(days));
 
     let filter = {
-      expiryDate: { 
-        $exists: true, 
+      expiryDate: {
+        $exists: true,
         $ne: null,
         $lte: expiryThreshold,
         $gte: new Date()
@@ -447,6 +447,41 @@ const getExpiringDocuments = async (req, res) => {
   }
 };
 
+const viewDocument = async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    const filePath = path.join(__dirname, "..", doc.fileUrl);
+    res.sendFile(filePath);
+
+  } catch (err) {
+    console.error("VIEW ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const downloadDocument = async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    const filePath = path.join(__dirname, "..", doc.fileUrl);
+
+    res.download(filePath, doc.fileName);
+
+  } catch (err) {
+    console.error("DOWNLOAD ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   uploadDocument,
   getMyDocuments,
@@ -456,5 +491,7 @@ module.exports = {
   getDocumentRequests,
   updateDocument,
   deleteDocument,
-  getExpiringDocuments
+  getExpiringDocuments,
+  viewDocument,
+  downloadDocument
 };

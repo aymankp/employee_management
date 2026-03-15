@@ -13,18 +13,23 @@ const userSchema = new mongoose.Schema(
       match: [/.+\@.+\..+/, "Please enter a valid email"],
     },
     password: { type: String, required: true },
-    
+
     // Role & Team
     role: {
       type: String,
       enum: ["employee", "manager", "admin"],
       default: "employee",
     },
-    team: { 
-      type: String, 
-      required: function() { 
-        return this.role !== 'admin'; 
-      } 
+    team: {
+      type: String,
+      required: function () {
+        return this.role !== "admin";
+      },
+      default: "general"
+    },
+    avatar: {
+      type: String,
+      default: ""
     },
 
     // Status
@@ -40,17 +45,17 @@ const userSchema = new mongoose.Schema(
     },
 
     // Employee ID (auto-generated)
-    employeeId: { 
-      type: String, 
+    employeeId: {
+      type: String,
       unique: true,
       sparse: true,
-      default: function() {
+      default: function () {
         const year = new Date().getFullYear();
         const random = Math.floor(1000 + Math.random() * 9000);
         return `EMP${year}${random}`;
       }
     },
-    
+
     // Personal Information
     personalInfo: {
       phone: { type: String, match: /^[0-9]{10}$/ },
@@ -61,7 +66,7 @@ const userSchema = new mongoose.Schema(
       maritalStatus: { type: String, enum: ['single', 'married', 'divorced'] },
       nationality: { type: String, default: 'Indian' }
     },
-    
+
     // Address
     address: {
       current: {
@@ -79,7 +84,7 @@ const userSchema = new mongoose.Schema(
         country: { type: String, default: 'India' }
       }
     },
-    
+
     // Emergency Contact
     emergencyContact: {
       name: String,
@@ -87,7 +92,7 @@ const userSchema = new mongoose.Schema(
       phone: String,
       address: String
     },
-    
+
     // Employment Details
     employmentDetails: {
       department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
@@ -95,15 +100,15 @@ const userSchema = new mongoose.Schema(
       joiningDate: { type: Date, default: Date.now },
       confirmationDate: Date,
       exitDate: Date,
-      employmentType: { 
-        type: String, 
-        enum: ['permanent', 'contract', 'probation', 'intern'], 
-        default: 'probation' 
+      employmentType: {
+        type: String,
+        enum: ['permanent', 'contract', 'probation', 'intern'],
+        default: 'probation'
       },
       workLocation: String,
       reportingTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
     },
-    
+
     // Bank Details
     bankDetails: {
       accountHolderName: String,
@@ -114,7 +119,7 @@ const userSchema = new mongoose.Schema(
       panNumber: String,
       uanNumber: String
     },
-    
+
     // Documents
     documents: [{
       type: { type: String, enum: ['resume', 'id-proof', 'degree', 'certificate'] },
@@ -122,7 +127,7 @@ const userSchema = new mongoose.Schema(
       fileUrl: String,
       uploadedAt: { type: Date, default: Date.now }
     }],
-    
+
     // Work History
     workHistory: [{
       company: String,
@@ -131,7 +136,7 @@ const userSchema = new mongoose.Schema(
       toDate: Date,
       responsibilities: String
     }],
-    
+
     // Education
     education: [{
       degree: String,
@@ -140,10 +145,10 @@ const userSchema = new mongoose.Schema(
       percentage: Number,
       documents: [String]
     }],
-    
+
     // Skills
     skills: [String],
-    
+
     // User Settings
     settings: {
       notifications: {
@@ -158,7 +163,7 @@ const userSchema = new mongoose.Schema(
       }
     }
   },
-  { 
+  {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -166,12 +171,12 @@ const userSchema = new mongoose.Schema(
 );
 
 // Virtual for full name (if needed)
-userSchema.virtual('fullName').get(function() {
+userSchema.virtual('fullName').get(function () {
   return this.name;
 });
 
 // Virtual for leave balance summary
-userSchema.virtual('leaveSummary').get(function() {
+userSchema.virtual('leaveSummary').get(function () {
   const summary = {};
   for (const [type, balance] of Object.entries(this.leaveBalance)) {
     summary[type] = {
