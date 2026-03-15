@@ -8,8 +8,6 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('📤 Request:', config.method, config.url, token ? '✅ Token present' : '❌ No token');
-    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -21,11 +19,9 @@ api.interceptors.request.use(
 // Response interceptor - FIXED VERSION
 api.interceptors.response.use(
   (response) => {
-    
     return response;
   },
   (error) => {
-    console.error('❌ API Error:', error.response?.status, error.config?.url);
     
     // ✅ ONLY clear token if it's REALLY unauthorized
     // if (error.response?.status === 401) {
@@ -50,8 +46,7 @@ api.interceptors.response.use(
 export const login = (email, password) => 
   api.post('/auth/login', { email, password });
 
-export const getProfile = () => 
-  api.get('/employees/me');
+export const getProfile = () => api.get('/employees/me');
 
 // Dashboard APIs
 export const getEmployeeDashboard = () => 
@@ -98,4 +93,11 @@ export const uploadDocument = (formData) =>
 export const getMyDocuments = () => 
   api.get('/documents/my');
 
+// Add these to your api service
+export const getManagerProfile = () => api.get('/managers/me');
+export const updateManagerProfile = (data) => api.put('/managers/me', data);
+export const uploadManagerAvatar = (formData) => api.put('/managers/me/avatar', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const getTeamMembers = () => api.get('/managers/team');
 export default api;

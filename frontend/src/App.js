@@ -21,6 +21,7 @@ import ManagerDashboard from './pages/manager/Dashboard';
 import TeamLeaves from './pages/manager/TeamLeaves';
 import TeamDocuments from './pages/manager/TeamDocuments';
 import Reports from './pages/manager/Reports';
+import ManagerProfile from './pages/manager/Profile';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -117,6 +118,7 @@ function AppRoutes() {
         <Route path="team-leaves" element={<TeamLeaves />} />
         <Route path="team-documents" element={<TeamDocuments />} />
         <Route path="reports" element={<Reports />} />
+         <Route path="profile" element={<ManagerProfile />} />
       </Route>
 
       {/* ADMIN */}

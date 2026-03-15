@@ -12,10 +12,13 @@ import {
   Key,
   Shield,
   Camera,
+  Users2,
+  FileText,
+  TrendingUp,
 } from "lucide-react";
-import "./Profile.css";
+import "../employee/Profile.css";
 
-export default function EmployeeProfile() {
+export default function ManagerProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -35,36 +38,36 @@ export default function EmployeeProfile() {
     fetchProfile();
   }, []);
 
-  const fetchProfile = async () => {
-    try {
-      const res = await api.get("/employees/me");
+ const fetchProfile = async () => {
+  try {
+    // Use only employee endpoint, remove the try-catch for manager endpoint
+    const response = await api.get("/employees/me");
+    
+    const userData = response.data.profile || response.data;
+    setProfile(userData);
 
-      const user = res.data.profile;
-
-      setProfile(user);
-
-      setFormData({
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.personalInfo?.phone || "",
-        address: user.address?.current?.street || "",
-        city: user.address?.current?.city || "",
-        state: user.address?.current?.state || "",
-        pincode: user.address?.current?.pincode || "",
-        emergencyContact: user.emergencyContact?.name || "",
-        emergencyPhone: user.emergencyContact?.phone || "",
-        bloodGroup: user.personalInfo?.bloodGroup || "",
-        dateOfBirth: user.personalInfo?.dateOfBirth
-          ? user.personalInfo.dateOfBirth.split("T")[0]
-          : "",
-      });
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      showMessage("error", "Failed to load profile");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setFormData({
+      name: userData.name || "",
+      email: userData.email || "",
+      phone: userData.personalInfo?.phone || "",
+      address: userData.address?.current?.street || "",
+      city: userData.address?.current?.city || "",
+      state: userData.address?.current?.state || "",
+      pincode: userData.address?.current?.pincode || "",
+      emergencyContact: userData.emergencyContact?.name || "",
+      emergencyPhone: userData.emergencyContact?.phone || "",
+      bloodGroup: userData.personalInfo?.bloodGroup || "",
+      dateOfBirth: userData.personalInfo?.dateOfBirth
+        ? userData.personalInfo.dateOfBirth.split("T")[0]
+        : "",
+    });
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    showMessage("error", "Failed to load profile");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -84,53 +87,91 @@ export default function EmployeeProfile() {
       [e.target.name]: e.target.value,
     });
   };
+
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Preview image
     setAvatar(URL.createObjectURL(file));
 
     const avatarFormData = new FormData();
     avatarFormData.append("avatar", file);
 
     try {
-      await api.put("/employees/me/avatar", avatarFormData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Try manager endpoint first
+      try {
+        await api.put("/managers/me/avatar", avatarFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } catch {
+        // Fallback to employee endpoint
+        await api.put("/employees/me/avatar", avatarFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
 
       showMessage("success", "Profile image updated!");
       fetchProfile();
     } catch (err) {
       showMessage("error", "Image upload failed");
+      // Revert preview on error
+      setAvatar(null);
     }
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.put("/employees/me", {
-        name: formData.name,
-        personalInfo: {
-          phone: formData.phone,
-          bloodGroup: formData.bloodGroup,
-          dateOfBirth: formData.dateOfBirth,
-        },
-        address: {
-          current: {
-            street: formData.address,
-            city: formData.city,
-            state: formData.state,
-            pincode: formData.pincode,
+      // Try manager endpoint first
+      try {
+        await api.put("/managers/me", {
+          name: formData.name,
+          personalInfo: {
+            phone: formData.phone,
+            bloodGroup: formData.bloodGroup,
+            dateOfBirth: formData.dateOfBirth,
           },
-        },
-        emergencyContact: {
-          name: formData.emergencyContact,
-          phone: formData.emergencyPhone,
-        },
-      });
+          address: {
+            current: {
+              street: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+            },
+          },
+          emergencyContact: {
+            name: formData.emergencyContact,
+            phone: formData.emergencyPhone,
+          },
+        });
+      } catch {
+        // Fallback to employee endpoint
+        await api.put("/employees/me", {
+          name: formData.name,
+          personalInfo: {
+            phone: formData.phone,
+            bloodGroup: formData.bloodGroup,
+            dateOfBirth: formData.dateOfBirth,
+          },
+          address: {
+            current: {
+              street: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+            },
+          },
+          emergencyContact: {
+            name: formData.emergencyContact,
+            phone: formData.emergencyPhone,
+          },
+        });
+      }
 
       showMessage("success", "Profile updated successfully!");
       setEditMode(false);
-      fetchProfile(); // Refresh data
+      fetchProfile();
     } catch (error) {
       showMessage(
         "error",
@@ -144,6 +185,11 @@ export default function EmployeeProfile() {
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       showMessage("error", "New passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      showMessage("error", "Password must be at least 6 characters long");
       return;
     }
 
@@ -168,6 +214,14 @@ export default function EmployeeProfile() {
     }
   };
 
+  const getTeamSize = () => {
+    return profile?.managedEmployees?.length || profile?.teamSize || 0;
+  };
+
+  const getPendingRequests = () => {
+    return profile?.pendingRequests || 0;
+  };
+
   if (loading) {
     return (
       <div className="profile-loading">
@@ -182,8 +236,8 @@ export default function EmployeeProfile() {
       {/* Header */}
       <div className="profile-header">
         <div className="header-content">
-          <h1>My Profile</h1>
-          <p>Manage your personal information and settings</p>
+          <h1>Manager Profile</h1>
+          <p>Manage your personal information and team settings</p>
         </div>
         <div className="header-actions">
           {!editMode && !passwordMode && (
@@ -260,27 +314,31 @@ export default function EmployeeProfile() {
           </div>
 
           <div className="info-card">
-            <h3>Employee Details</h3>
+            <h3>Manager Details</h3>
             <div className="info-item">
               <Briefcase size={16} />
               <div>
                 <span className="info-label">Employee ID</span>
-                <span className="info-value">{profile?.employeeId}</span>
+                <span className="info-value">{profile?.employeeId || "N/A"}</span>
               </div>
             </div>
             <div className="info-item">
               <Shield size={16} />
               <div>
                 <span className="info-label">Role</span>
-                <span className="info-value role-badge">{profile?.role}</span>
+                <span className="info-value role-badge manager">
+                  {profile?.role || "Manager"}
+                </span>
               </div>
             </div>
             <div className="info-item">
-              <Users size={16} />
+              <Users2 size={16} />
               <div>
-                <span className="info-label">Team</span>
+                <span className="info-label">Department</span>
                 <span className="info-value">
-                  {profile?.team || "Not assigned"}
+                  {profile?.managedDepartment?.name || 
+                   profile?.department || 
+                   "Not assigned"}
                 </span>
               </div>
             </div>
@@ -293,6 +351,32 @@ export default function EmployeeProfile() {
                     ? new Date(profile.createdAt).toLocaleDateString()
                     : "N/A"}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Manager Stats Cards */}
+          <div className="info-card manager-stats">
+            <h3>Team Overview</h3>
+            <div className="stat-item">
+              <Users size={20} className="stat-icon" />
+              <div className="stat-details">
+                <span className="stat-label">Team Size</span>
+                <span className="stat-value">{getTeamSize()} members</span>
+              </div>
+            </div>
+            <div className="stat-item">
+              <FileText size={20} className="stat-icon" />
+              <div className="stat-details">
+                <span className="stat-label">Pending Requests</span>
+                <span className="stat-value">{getPendingRequests()}</span>
+              </div>
+            </div>
+            <div className="stat-item">
+              <TrendingUp size={20} className="stat-icon" />
+              <div className="stat-details">
+                <span className="stat-label">Team Performance</span>
+                <span className="stat-value">View Reports →</span>
               </div>
             </div>
           </div>
@@ -478,6 +562,32 @@ export default function EmployeeProfile() {
                 </div>
               </div>
 
+              <div className="form-section">
+                <h3>Department Information</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Department</label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
+                      className="form-control"
+                      disabled
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Designation</label>
+                    <input
+                      type="text"
+                      name="designation"
+                      value={formData.designation}
+                      className="form-control"
+                      disabled
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary">
                   <Save size={16} />
@@ -513,6 +623,7 @@ export default function EmployeeProfile() {
                       required
                       minLength="6"
                     />
+                    <small className="form-text">Minimum 6 characters</small>
                   </div>
                   <div className="form-group full-width">
                     <label>Confirm New Password</label>
@@ -628,15 +739,17 @@ export default function EmployeeProfile() {
                   <div className="info-row">
                     <span className="label">Department</span>
                     <span className="value">
-                      {profile?.employmentDetails?.department?.name ||
-                        "Not assigned"}
+                      {profile?.managedDepartment?.name || 
+                       profile?.employmentDetails?.department?.name ||
+                       "Not assigned"}
                     </span>
                   </div>
                   <div className="info-row">
                     <span className="label">Designation</span>
                     <span className="value">
                       {profile?.employmentDetails?.designation ||
-                        "Not assigned"}
+                       profile?.designation ||
+                       "Not assigned"}
                     </span>
                   </div>
                   <div className="info-row">
@@ -653,7 +766,7 @@ export default function EmployeeProfile() {
                     <span className="label">Employment Type</span>
                     <span className="value employment-type">
                       {profile?.employmentDetails?.employmentType ||
-                        "Not specified"}
+                       "Not specified"}
                     </span>
                   </div>
                 </div>

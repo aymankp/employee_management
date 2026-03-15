@@ -5,7 +5,8 @@ import { useAuth } from "../../context/AuthContext";
 import "./Dashboard.css";
 import Widget from "../../components/Dashboard/Widget";
 import SkeletonCard from "../../components/Dashboard/SkeletonCard";
-
+import { getProfile } from "../../services/api";
+import { useMemo } from "react";
 import {
   Chart as ChartJS,
   BarElement,
@@ -35,7 +36,7 @@ export default function EmployeeDashboard() {
   const [balance, setBalance] = useState(null);
   const [managerOnline, setManagerOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState(null);
-
+  const [error, setError] = useState(null);
   const managerId = user?.manager;
 
   // ------------------------
@@ -46,26 +47,42 @@ export default function EmployeeDashboard() {
     try {
       const res = await api.get("/leave/my");
       setLeaves(res.data);
+      setError(null);
     } catch (err) {
-      console.error(err);
+      setError("Failed to load leaves");
     }
   };
-  const fetchBalance = async () => {
-    const res = await api.get("/auth/me");
+ const fetchBalance = async () => {
+  try {
+    const res = await getProfile();
     setBalance(res.data.leaveBalance);
-  };
+  } catch (err) {
+    setError("Failed to load leave balance");
+  }
+};
 
   const fetchManagerStatus = async () => {
-    if (!managerId) return;
+  if (!managerId) return;
+
+  try {
     const res = await api.get(`/status/${managerId}`);
     setManagerOnline(res.data.online);
     setLastSeen(res.data.lastSeen);
-  };
+  } catch (err) {
+    console.error("Manager status fetch failed");
+  }
+};
+
+
   useEffect(() => {
     if (!user) return;
 
     const load = async () => {
-      await Promise.all([fetchLeaves(), fetchBalance(), fetchManagerStatus()]);
+      await Promise.allSettled([
+        fetchLeaves(),
+        fetchBalance(),
+        fetchManagerStatus(),
+      ]);
       setLoading(false);
     };
 
@@ -75,24 +92,22 @@ export default function EmployeeDashboard() {
   // ------------------------
   // Socket realtime manager status
   // ------------------------
+useEffect(() => {
+  if (!managerId) return;
 
-  useEffect(() => {
-    if (!managerId) return;
+  const handler = (data) => {
+    if (String(data.userId) === String(managerId)) {
+      setManagerOnline(data.online);
+      setLastSeen(data.lastSeen);
+    }
+  };
 
-    socket.connect();
+  socket.on("status-update", handler);
 
-    socket.on("status-update", (data) => {
-      if (String(data.userId) === String(managerId)) {
-        setManagerOnline(data.online);
-        setLastSeen(data.lastSeen);
-      }
-    });
-
-    return () => {
-      socket.off("status-update");
-      socket.disconnect();
-    };
-  }, [managerId]);
+  return () => {
+    socket.off("status-update", handler);
+  };
+}, [managerId]);
 
   // ------------------------
   // Chart
@@ -115,81 +130,76 @@ export default function EmployeeDashboard() {
   const emergencyRemaining = emergencyTotal - emergencyUsed;
   const otherRemaining = otherTotal - otherUsed;
 
-  const chartData = {
-  labels: ["Casual", "Sick", "Emergency", "Other"],
-  datasets: [
-    {
-      label: "Used",
-      data: [casualUsed, sickUsed, emergencyUsed, otherUsed],
-      backgroundColor: "#ef4444",
-      borderRadius: 6,
-      stack: "leave"
-    },
-    {
-      label: "Remaining",
-      data: [
-        casualRemaining,
-        sickRemaining,
-        emergencyRemaining,
-        otherRemaining
+ const totalRemaining = Math.max(
+  casualRemaining + sickRemaining + emergencyRemaining + otherRemaining,
+  0
+);
+
+  const chartData = useMemo(
+    () => ({
+      labels: ["Casual", "Sick", "Emergency", "Other"],
+      datasets: [
+        {
+          label: "Used",
+          data: [casualUsed, sickUsed, emergencyUsed, otherUsed],
+          backgroundColor: "#ef4444",
+          borderRadius: 6,
+          stack: "leave",
+        },
+        {
+          label: "Remaining",
+          data: [
+            casualRemaining,
+            sickRemaining,
+            emergencyRemaining,
+            otherRemaining,
+          ],
+          backgroundColor: "#10b981",
+          borderRadius: 6,
+          stack: "leave",
+        },
       ],
-      backgroundColor: "#10b981",
-      borderRadius: 6,
-      stack: "leave"
-    }
-  ]
-};
+    }),
+    [
+      casualUsed,
+      sickUsed,
+      emergencyUsed,
+      otherUsed,
+      casualRemaining,
+      sickRemaining,
+      emergencyRemaining,
+      otherRemaining,
+    ],
+  );
 
-<<<<<<< HEAD
-const isDark = document.body.classList.contains("dark");
-
-const chartOptions = {
-  responsive:true,
-  plugins:{
-    legend:{
-      labels:{
-        color:isDark ? "#e2e8f0" : "#334155"
-      }
-    }
-  },
-  scales:{
-    x:{
-      ticks:{ color:isDark ? "#e2e8f0" : "#334155" },
-      grid:{ color:isDark ? "#334155" : "#e2e8f0" }
-    },
-    y:{
-      ticks:{ color:isDark ? "#e2e8f0" : "#334155" },
-      grid:{ color:isDark ? "#334155" : "#e2e8f0" }
-=======
   const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
+    responsive: true,
+    maintainAspectRatio: false,
 
-  plugins: {
-    legend: {
-      position: "top"
-    }
-  },
-
-  scales: {
-    x: {
-      stacked: true
+    plugins: {
+      legend: {
+        position: "top",
+      },
     },
-    y: {
-      stacked: true,
-      beginAtZero: true,
-      ticks: {
-        stepSize: 1
-      }
->>>>>>> 4f7ecac (update backend)
-    }
-  }
-};
+
+    scales: {
+      x: {
+        stacked: true,
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1,
+        },
+      },
+    },
+  };
   // ------------------------
   // Helpers
   // ------------------------
 
-  const formatDate = (d) => new Date(d).toLocaleDateString();
+  const formatDate = (d) => new Date(d).toLocaleDateString("en-IN");
 
   const formatLastSeen = (t) => {
     if (!t) return "Unknown";
@@ -245,13 +255,15 @@ const chartOptions = {
 
   return (
     <div className="employee-dashboard">
+      {error && <div className="error-banner">{error}</div>}
       {/* Header */}
-      <div className="dashboard-header motivation-header">
+      <div className="dashboard-header">
         <div className="motivation-wrapper">
           <span className="motivation-label">Today you are</span>
           <span className="motivation-text">{word}</span>
         </div>
       </div>
+      
       {/* KPI Cards */}
       <div className="stats-grid">
         {loading ? (
@@ -262,14 +274,12 @@ const chartOptions = {
           </>
         ) : (
           <>
-            {balance && (
+            {balance && ( // ← Leave Balance Card
               <Widget
                 icon={<Calendar size={22} />}
                 title="Leave Balance"
-                value={
-                  (balance.casual?.total || 0) + (balance.sick?.total || 0)
-                }
-                subtitle="Days remaining"
+                value={totalRemaining}
+                subtitle="Total days remaining"
               />
             )}
 
@@ -285,9 +295,13 @@ const chartOptions = {
               title="Manager Status"
               value={
                 managerOnline ? (
-                  <span className="status-online">● Online</span>
+                  <span className="status-online">
+                    <span className="dot1"></span> Online
+                  </span>
                 ) : (
-                  <span className="status-offline">● Offline</span>
+                  <span className="status-offline">
+                    <span className="dot2"></span> Offline
+                  </span>
                 )
               }
               subtitle={lastSeen ? `Last seen ${formatLastSeen(lastSeen)}` : ""}
@@ -295,21 +309,26 @@ const chartOptions = {
           </>
         )}
       </div>
-
       {/* Analytics */}
-
       <div className="card">
         <div className="card-header">
           <h3>Leave Usage</h3>
         </div>
 
         <div className="card-body chart-container">
-        <Bar key={isDark ? "dark" : "light"} data={chartData} options={chartOptions}/>
+          {loading ? (
+            <div className="skeleton-chart">
+              <div className="skeleton-bar"></div>
+              <div className="skeleton-bar"></div>
+              <div className="skeleton-bar"></div>
+              <div className="skeleton-bar"></div>
+            </div>
+          ) : (
+            <Bar data={chartData} options={chartOptions} />
+          )}
         </div>
       </div>
-
       {/* Recent Leaves */}
-
       <div className="card">
         <div className="card-header">
           <h3>Recent Leaves</h3>

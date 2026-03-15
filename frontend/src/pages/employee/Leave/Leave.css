@@ -83,21 +83,6 @@
 .reason-cell{
   max-width:250px;
 }
-<<<<<<< HEAD
-
-body.dark .filters-card,
-body.dark .table-card{
-  background:#1e293b;
-  color:#e2e8f0;
-}
-
-body.dark .table th{
-  border-bottom:1px solid #334155;
-}
-
-body.dark .table td{
-  border-bottom:1px solid #334155;
-=======
 .table-card{
   background:#ffffff !important;
   color:#1e293b !important;
@@ -123,5 +108,4 @@ body.dark .table td{
 }
 .table tbody tr td{
   transition:0.2s;
->>>>>>> 4f7ecac (update backend)
 }

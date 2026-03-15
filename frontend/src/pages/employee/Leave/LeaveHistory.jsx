@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useState, useEffect } from "react";
-=======
 import { useState, useEffect, useMemo } from "react";
->>>>>>> 4f7ecac (update backend)
 import api from "../../../services/api";
 import {
   Calendar,
@@ -49,36 +45,6 @@ export default function LeaveHistory() {
 
   /* ---------- Filter Logic ---------- */
 
-<<<<<<< HEAD
-  const fetchLeaves = async () => {
-    try {
-      const res = await api.get("/leave/my");
-      setLeaves(res.data);
-    } catch (error) {
-      console.error("Error fetching leaves:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterLeaves = () => {
-    let filtered = [...leaves];
-
-    // Filter by status
-    if (filters.status !== "all") {
-      filtered = filtered.filter((l) => l.status === filters.status);
-    }
-
-    // Filter by type
-    if (filters.type !== "all") {
-      filtered = filtered.filter((l) => l.leaveType === filters.type);
-    }
-
-    // Filter by search (reason)
-    if (filters.search.trim() !== "") {
-      filtered = filtered.filter((l) =>
-        l.reason.toLowerCase().includes(filters.search.toLowerCase()),
-=======
   const filteredLeaves = useMemo(() => {
     let filtered = [...leaves].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
@@ -87,7 +53,6 @@ export default function LeaveHistory() {
     if (filters.status !== "all") {
       filtered = filtered.filter(
         (l) => l.status?.toLowerCase() === filters.status.toLowerCase(),
->>>>>>> 4f7ecac (update backend)
       );
     }
 
@@ -125,30 +90,18 @@ export default function LeaveHistory() {
             <CheckCircle size={12} /> Approved
           </span>
         );
-<<<<<<< HEAD
-=======
-
->>>>>>> 4f7ecac (update backend)
       case "rejected":
         return (
           <span className="badge badge-danger">
             <XCircle size={12} /> Rejected
           </span>
         );
-<<<<<<< HEAD
-=======
-
->>>>>>> 4f7ecac (update backend)
       case "pending":
         return (
           <span className="badge badge-warning">
             <AlertCircle size={12} /> Pending
           </span>
         );
-<<<<<<< HEAD
-=======
-
->>>>>>> 4f7ecac (update backend)
       default:
         return <span className="badge badge-secondary">{status}</span>;
     }
@@ -158,15 +111,10 @@ export default function LeaveHistory() {
     switch (type) {
       case "casual":
         return <span className="badge badge-casual">Casual</span>;
-<<<<<<< HEAD
-      case "sick":
-        return <span className="badge badge-sick">Sick</span>;
-=======
 
       case "sick":
         return <span className="badge badge-sick">Sick</span>;
 
->>>>>>> 4f7ecac (update backend)
       case "emergency":
         return <span className="badge badge-danger">Emergency</span>;
 
@@ -204,10 +152,6 @@ export default function LeaveHistory() {
 
           <div className="filter-group">
             <label>Status</label>
-<<<<<<< HEAD
-=======
-
->>>>>>> 4f7ecac (update backend)
             <select
               value={filters.status}
               onChange={(e) =>
@@ -226,10 +170,6 @@ export default function LeaveHistory() {
 
           <div className="filter-group">
             <label>Leave Type</label>
-<<<<<<< HEAD
-=======
-
->>>>>>> 4f7ecac (update backend)
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
