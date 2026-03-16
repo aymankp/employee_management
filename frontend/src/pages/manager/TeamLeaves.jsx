@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";  // ✅ Added useCallback
+import { useState, useEffect, useCallback } from "react";
 import api from '../../services/api';
 import { 
   Calendar,
@@ -40,34 +40,7 @@ export default function TeamLeaves() {
   const [employees, setEmployees] = useState([]);
   const [aiRecommendations, setAiRecommendations] = useState({});
 
-  // ========== FETCH FUNCTIONS ==========
-  const fetchTeamLeaves = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/leave/team/pending");
-      setLeaves(res.data);
-      
-      // Fetch AI recommendations for each leave
-      res.data.forEach(leave => {
-        fetchAIRecommendation(leave._id);
-      });
-    } catch (error) {
-      console.error("Error fetching team leaves:", error);
-      showMessage("error", "Failed to load team leaves");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchTeamMembers = useCallback(async () => {
-    try {
-      const res = await api.get("/employees/team");
-      setEmployees(res.data.employees || []);
-    } catch (error) {
-      console.error("Error fetching team members:", error);
-    }
-  }, []);
-
+  // FIX 1: PEHLE fetchAIRecommendation define karo
   const fetchAIRecommendation = useCallback(async (leaveId) => {
     try {
       const res = await api.get(`/leave/${leaveId}/analyze`);
@@ -80,7 +53,59 @@ export default function TeamLeaves() {
     }
   }, []);
 
-  // ========== FILTER & STATS ==========
+  // FIX 2: FIR fetchTeamLeaves define karo (ab fetchAIRecommendation available hai)
+  const fetchTeamLeaves = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/leave/team/pending");
+      setLeaves(res.data);
+      
+      // Fetch AI recommendations for each leave
+      if (Array.isArray(res.data)) {
+        res.data.forEach(leave => {
+          fetchAIRecommendation(leave._id);  // Ab ye safely use ho sakta hai
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching team leaves:", error);
+      showMessage("error", "Failed to load team leaves");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchAIRecommendation]);  // Dependency sahi hai
+
+  const fetchTeamMembers = useCallback(async () => {
+    try {
+      console.log('📋 Fetching team members for TeamLeaves...');
+      
+      let response;
+      try {
+        response = await api.get("/managers/employees/team");
+      } catch (err1) {
+        try {
+          response = await api.get("/managers/team/members");
+        } catch (err2) {
+          response = await api.get("/employees/team");
+        }
+      }
+      
+      if (response.data.employees) {
+        setEmployees(response.data.employees);
+        console.log(`✅ Found ${response.data.employees.length} team members`);
+      } else if (response.data.team) {
+        setEmployees(response.data.team);
+      } else if (Array.isArray(response.data)) {
+        setEmployees(response.data);
+      } else {
+        setEmployees([]);
+      }
+      
+    } catch (error) {
+      console.error("❌ Error fetching team members:", error);
+      setEmployees([]);
+    }
+  }, []);
+
   const filterLeaves = useCallback(() => {
     let filtered = [...leaves];
 
@@ -132,24 +157,11 @@ export default function TeamLeaves() {
     });
   }, [leaves, aiRecommendations]);
 
-  // ========== USE EFFECTS ==========
-  useEffect(() => {
-    fetchTeamLeaves();
-    fetchTeamMembers();
-  }, [fetchTeamLeaves, fetchTeamMembers]);
-
-  useEffect(() => {
-    filterLeaves();
-    calculateStats();
-  }, [leaves, filters, aiRecommendations, filterLeaves, calculateStats]);
-
-  // ========== MESSAGE HELPER ==========
   const showMessage = (type, text) => {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: "", text: "" }), 3000);
   };
 
-  // ========== ACTIONS ==========
   const handleApprove = async (leaveId) => {
     setProcessing(prev => ({ ...prev, [leaveId]: true }));
     try {
@@ -211,7 +223,18 @@ export default function TeamLeaves() {
     }
   };
 
-  // ========== BADGES ==========
+  // ========== USE EFFECTS ==========
+  useEffect(() => {
+    fetchTeamLeaves();
+    fetchTeamMembers();
+  }, [fetchTeamLeaves, fetchTeamMembers]);
+
+  useEffect(() => {
+    filterLeaves();
+    calculateStats();
+  }, [leaves, filters, aiRecommendations, filterLeaves, calculateStats]);
+
+  // Badge functions...
   const getRiskBadge = (risk) => {
     switch(risk) {
       case 'High':
@@ -248,7 +271,7 @@ export default function TeamLeaves() {
 
   return (
     <div className="team-leaves-container">
-      {/* Header - same as before */}
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Team Leaves</h1>

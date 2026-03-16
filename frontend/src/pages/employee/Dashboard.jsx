@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
-import socket from "../../socket";
+import socketService from "../../services/socket"; 
 import { useAuth } from "../../context/AuthContext";
 import "./Dashboard.css";
 import Widget from "../../components/Dashboard/Widget";
@@ -37,8 +37,8 @@ export default function EmployeeDashboard() {
   const [managerOnline, setManagerOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState(null);
   const [error, setError] = useState(null);
-  const managerId = user?.manager;
-
+  const managerId = user?.employmentDetails?.reportingTo;
+console.log("Manager ID:", managerId);
   // ------------------------
   // Fetch Data
   // ------------------------
@@ -102,11 +102,11 @@ useEffect(() => {
     }
   };
 
-  socket.on("status-update", handler);
+ socketService.on("status-update", handler);
 
-  return () => {
-    socket.off("status-update", handler);
-  };
+return () => {
+  socketService.off("status-update", handler);
+};
 }, [managerId]);
 
   // ------------------------

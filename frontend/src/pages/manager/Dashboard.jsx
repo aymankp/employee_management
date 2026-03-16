@@ -1,11 +1,11 @@
-import api from '../../services/api';
-import socket from "../../socket";
+import api from "../../services/api";
+import socketService from "../../services/socket"; // Fixed: import socketService instead of socket
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
+import {
+  CheckCircle,
+  XCircle,
+  AlertCircle,
   Users,
   Mail,
   Calendar,
@@ -13,8 +13,8 @@ import {
   MessageSquare,
   Brain,
   RefreshCw,
-  TrendingUp
-} from 'lucide-react';
+  TrendingUp,
+} from "lucide-react";
 import "./Dashboard.css";
 
 export default function ManagerDashboard() {
@@ -27,50 +27,23 @@ export default function ManagerDashboard() {
     total: 0,
     highRisk: 0,
     mediumRisk: 0,
-    lowRisk: 0
+    lowRisk: 0,
   });
+  const [selectedReason, setSelectedReason] = useState(null);
 
-  const fetchPendingLeaves = async () => {
-    try {
-      const res = await api.get("/leave/pending");
-      setLeaves(res.data);
-      
-      // Update stats based on recommendations
-      const high = res.data.filter(l => recommendations[l._id] === 'High').length;
-      const medium = res.data.filter(l => recommendations[l._id] === 'Medium').length;
-      const low = res.data.filter(l => recommendations[l._id] === 'Low').length;
-      
-      setStats({
-        total: res.data.length,
-        highRisk: high,
-        mediumRisk: medium,
-        lowRisk: low
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // 🔥 SOCKET LOGIC (FIXED) & idle detectection
+  // SOCKET LOGIC (FIXED) & idle detection
   useEffect(() => {
     if (!user?.id) return;
-
-    socket.connect();
-
-    socket.on("connect", () => {
-      socket.emit("user-online", user.id);
-    });
 
     let idleTimeout;
 
     const goIdle = () => {
-      socket.emit("user-idle", user.id);
+      socketService.emit("user-idle", user._id);
     };
 
     const resetTimer = () => {
       clearTimeout(idleTimeout);
-      socket.emit("user-online", user.id);
-      idleTimeout = setTimeout(goIdle, 300000); // 5 minutes
+      idleTimeout = setTimeout(goIdle, 300000);
     };
 
     resetTimer();
@@ -84,7 +57,6 @@ export default function ManagerDashboard() {
       window.removeEventListener("mousemove", resetTimer);
       window.removeEventListener("keydown", resetTimer);
       window.removeEventListener("click", resetTimer);
-      socket.disconnect();
     };
   }, [user?.id]);
 
@@ -98,12 +70,12 @@ export default function ManagerDashboard() {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
-      
+
       // Remove from list after action
-      setLeaves(prev => prev.filter(l => l._id !== leaveId));
-      
+      setLeaves((prev) => prev.filter((l) => l._id !== leaveId));
+
       // Show success message
       alert(`Leave ${status} successfully!`);
     } catch (err) {
@@ -116,41 +88,38 @@ export default function ManagerDashboard() {
 
   const fetchRecommendation = async (leaveId) => {
     try {
-      setAiLoading(prev => ({ ...prev, [leaveId]: true }));
+      setAiLoading((prev) => ({ ...prev, [leaveId]: true }));
       console.log("Fetching AI for:", leaveId);
-      
-      const res = await api.get(
-        `/leave/${leaveId}/analyze`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`
-          }
-        }
-      );
+
+      const res = await api.post(`/leave/${leaveId}/analyze`);
 
       setRecommendations((prev) => ({
         ...prev,
-        [leaveId]: res.data.risk || 'Medium',
+        [leaveId]: res.data.risk || "Medium",
       }));
-      
-      setAiLoading(prev => ({ ...prev, [leaveId]: false }));
+
+      setAiLoading((prev) => ({ ...prev, [leaveId]: false }));
     } catch (err) {
       console.log(err);
       setRecommendations((prev) => ({
         ...prev,
-        [leaveId]: 'Medium',
+        [leaveId]: "Medium",
       }));
-      setAiLoading(prev => ({ ...prev, [leaveId]: false }));
+      setAiLoading((prev) => ({ ...prev, [leaveId]: false }));
     }
   };
 
   const fetchLeaves = useCallback(async () => {
-    const res = await api.get("/leave/pending");
-    setLeaves(res.data);
+    try {
+      const res = await api.get("/leave/pending");
+      setLeaves(res.data);
 
-    res.data.forEach((leave) => {
-      fetchRecommendation(leave._id);
-    });
+      res.data.forEach((leave) => {
+        fetchRecommendation(leave._id);
+      });
+    } catch (err) {
+      console.error("Error fetching leaves:", err);
+    }
   }, []);
 
   useEffect(() => {
@@ -159,26 +128,40 @@ export default function ManagerDashboard() {
 
   // Update stats when recommendations change
   useEffect(() => {
-    const high = leaves.filter(l => recommendations[l._id] === 'High').length;
-    const medium = leaves.filter(l => recommendations[l._id] === 'Medium').length;
-    const low = leaves.filter(l => recommendations[l._id] === 'Low').length;
-    
+    const high = leaves.filter((l) => recommendations[l._id] === "High").length;
+    const medium = leaves.filter(
+      (l) => recommendations[l._id] === "Medium",
+    ).length;
+    const low = leaves.filter((l) => recommendations[l._id] === "Low").length;
+
     setStats({
       total: leaves.length,
       highRisk: high,
       mediumRisk: medium,
-      lowRisk: low
+      lowRisk: low,
     });
   }, [recommendations, leaves]);
 
   const getRiskBadge = (risk) => {
-    switch(risk) {
-      case 'High':
-        return <span className="badge badge-danger"><AlertCircle size={12} /> High Risk</span>;
-      case 'Medium':
-        return <span className="badge badge-warning"><AlertCircle size={12} /> Medium Risk</span>;
-      case 'Low':
-        return <span className="badge badge-success"><CheckCircle size={12} /> Low Risk</span>;
+    switch (risk) {
+      case "High":
+        return (
+          <span className="badge badge-danger">
+            <AlertCircle size={12} /> High Risk
+          </span>
+        );
+      case "Medium":
+        return (
+          <span className="badge badge-warning">
+            <AlertCircle size={12} /> Medium Risk
+          </span>
+        );
+      case "Low":
+        return (
+          <span className="badge badge-success">
+            <CheckCircle size={12} /> Low Risk
+          </span>
+        );
       default:
         return <span className="badge badge-secondary">Unknown</span>;
     }
@@ -190,7 +173,10 @@ export default function ManagerDashboard() {
       <div className="dashboard-header">
         <div>
           <h1 className="page-title">Manager Dashboard</h1>
-          <p className="page-subtitle">Welcome back, {user?.name}! Here are the pending leave requests for your team.</p>
+          <p className="page-subtitle">
+            Welcome back, {user?.name}! Here are the pending leave requests for
+            your team.
+          </p>
         </div>
         <div className="header-actions">
           <button className="btn btn-outline" onClick={fetchLeaves}>
@@ -207,7 +193,10 @@ export default function ManagerDashboard() {
       {/* Stats Cards */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#dbeafe", color: "#2563eb" }}
+          >
             <FileText size={24} />
           </div>
           <div className="stat-content">
@@ -218,7 +207,10 @@ export default function ManagerDashboard() {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#fee2e2", color: "#dc2626" }}
+          >
             <AlertCircle size={24} />
           </div>
           <div className="stat-content">
@@ -229,7 +221,10 @@ export default function ManagerDashboard() {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#fef3c7", color: "#d97706" }}
+          >
             <TrendingUp size={24} />
           </div>
           <div className="stat-content">
@@ -240,7 +235,10 @@ export default function ManagerDashboard() {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#dcfce7", color: "#16a34a" }}
+          >
             <CheckCircle size={24} />
           </div>
           <div className="stat-content">
@@ -280,15 +278,24 @@ export default function ManagerDashboard() {
                 </thead>
                 <tbody>
                   {leaves.map((l) => (
-                    <tr key={l._id} className={recommendations[l._id] === 'High' ? 'high-risk-row' : ''}>
+                    <tr
+                      key={l._id}
+                      className={
+                        recommendations[l._id] === "High" ? "high-risk-row" : ""
+                      }
+                    >
                       <td>
                         <div className="employee-info">
                           <div className="employee-avatar">
                             {l.employee?.name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="employee-name">{l.employee?.name}</div>
-                            <div className="employee-role">{l.employee?.role}</div>
+                            <div className="employee-name">
+                              {l.employee?.name}
+                            </div>
+                            <div className="employee-role">
+                              {l.employee?.role}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -301,7 +308,10 @@ export default function ManagerDashboard() {
                       <td>
                         <div className="date-range">
                           <Calendar size={14} />
-                          <span>{new Date(l.fromDate).toLocaleDateString()} - {new Date(l.toDate).toLocaleDateString()}</span>
+                          <span>
+                            {new Date(l.fromDate).toLocaleDateString()} -{" "}
+                            {new Date(l.toDate).toLocaleDateString()}
+                          </span>
                         </div>
                       </td>
                       <td>
@@ -310,9 +320,20 @@ export default function ManagerDashboard() {
                         </span>
                       </td>
                       <td>
-                        <div className="reason-cell">
-                          <MessageSquare size={14} />
-                          <span>{l.reason}</span>
+                        <div
+                          className="reason-cell"
+                          title={
+                            l.reason && l.reason.length > 100 ? l.reason : ""
+                          }
+                        >
+                          <MessageSquare size={14} className="reason-icon" />
+                          <div className="reason-content">
+                            <span className="reason-text">
+                              {l.reason && l.reason.length > 60
+                                ? `${l.reason.substring(0, 60)}...`
+                                : l.reason || "No reason provided"}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td>

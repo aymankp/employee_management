@@ -1,7 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react'; // Added useRef
+
+// Import socket service
+import socketService from './services/socket'; // <-- ADD THIS IMPORT
+
 // Auth Pages
 import Login from './pages/auth/Login';
 
@@ -58,10 +62,10 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 function AppRoutes() {
-
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, role, user } = useAuth(); // Added user
+  const socketInitialized = useRef(false); // Add this ref to track socket connection
+  // Theme effect
   useEffect(() => {
-
     if (!role) return;
     const savedTheme = localStorage.getItem(`${role}-theme`);
     if (savedTheme === "dark") {
@@ -71,10 +75,8 @@ function AppRoutes() {
     }
   }, [role]);
 
-
   return (
     <Routes>
-
       {/* LOGIN */}
       <Route
         path="/login"
@@ -118,7 +120,7 @@ function AppRoutes() {
         <Route path="team-leaves" element={<TeamLeaves />} />
         <Route path="team-documents" element={<TeamDocuments />} />
         <Route path="reports" element={<Reports />} />
-         <Route path="profile" element={<ManagerProfile />} />
+        <Route path="profile" element={<ManagerProfile />} />
       </Route>
 
       {/* ADMIN */}
@@ -140,10 +142,7 @@ function AppRoutes() {
 
       {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/login" replace />} />
-
     </Routes>
-
-
   );
 }
 

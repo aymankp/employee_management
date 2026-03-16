@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
 import { useRef } from "react";
+import { useAuth } from "../../context/AuthContext";
 
 import {
   Calendar,
@@ -19,6 +20,7 @@ import {
 import "../employee/Profile.css";
 
 export default function ManagerProfile() {
+  const { user: authUser, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -38,36 +40,36 @@ export default function ManagerProfile() {
     fetchProfile();
   }, []);
 
- const fetchProfile = async () => {
-  try {
-    // Use only employee endpoint, remove the try-catch for manager endpoint
-    const response = await api.get("/employees/me");
-    
-    const userData = response.data.profile || response.data;
-    setProfile(userData);
+  const fetchProfile = async () => {
+    try {
+      // Use only employee endpoint, remove the try-catch for manager endpoint
+      const response = await api.get("/employees/me");
 
-    setFormData({
-      name: userData.name || "",
-      email: userData.email || "",
-      phone: userData.personalInfo?.phone || "",
-      address: userData.address?.current?.street || "",
-      city: userData.address?.current?.city || "",
-      state: userData.address?.current?.state || "",
-      pincode: userData.address?.current?.pincode || "",
-      emergencyContact: userData.emergencyContact?.name || "",
-      emergencyPhone: userData.emergencyContact?.phone || "",
-      bloodGroup: userData.personalInfo?.bloodGroup || "",
-      dateOfBirth: userData.personalInfo?.dateOfBirth
-        ? userData.personalInfo.dateOfBirth.split("T")[0]
-        : "",
-    });
-  } catch (error) {
-    console.error("Error fetching profile:", error);
-    showMessage("error", "Failed to load profile");
-  } finally {
-    setLoading(false);
-  }
-};
+      const userData = response.data.profile || response.data;
+      setProfile(userData);
+
+      setFormData({
+        name: userData.name || "",
+        email: userData.email || "",
+        phone: userData.personalInfo?.phone || "",
+        address: userData.address?.current?.street || "",
+        city: userData.address?.current?.city || "",
+        state: userData.address?.current?.state || "",
+        pincode: userData.address?.current?.pincode || "",
+        emergencyContact: userData.emergencyContact?.name || "",
+        emergencyPhone: userData.emergencyContact?.phone || "",
+        bloodGroup: userData.personalInfo?.bloodGroup || "",
+        dateOfBirth: userData.personalInfo?.dateOfBirth
+          ? userData.personalInfo.dateOfBirth.split("T")[0]
+          : "",
+      });
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      showMessage("error", "Failed to load profile");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -92,34 +94,64 @@ export default function ManagerProfile() {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Clean up any existing preview URL
+    if (avatar) {
+      URL.revokeObjectURL(avatar);
+    }
+
     // Preview image
-    setAvatar(URL.createObjectURL(file));
+    const previewUrl = URL.createObjectURL(file);
+    setAvatar(previewUrl);
 
     const avatarFormData = new FormData();
     avatarFormData.append("avatar", file);
 
     try {
+      let response;
       // Try manager endpoint first
       try {
-        await api.put("/managers/me/avatar", avatarFormData, {
+        response = await api.put("/managers/me/avatar", avatarFormData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } catch {
         // Fallback to employee endpoint
-        await api.put("/employees/me/avatar", avatarFormData, {
+        response = await api.put("/employees/me/avatar", avatarFormData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
 
-      showMessage("success", "Profile image updated!");
-      fetchProfile();
+      console.log("Avatar upload response:", response.data);
+
+      // IMPORTANT: Update the user in AuthContext with new avatar FIRST
+      if (response.data.avatar) {
+        // Update context immediately - this will trigger header update
+        updateUser({ avatar: response.data.avatar });
+
+        // Trigger custom event for header
+        window.dispatchEvent(
+          new CustomEvent("profile-updated", {
+            detail: { avatar: response.data.avatar },
+          }),
+        );
+
+        // Then fetch profile data in background
+        fetchProfile().then(() => {
+          // Clear preview after successful fetch
+          setAvatar(null);
+        });
+      } else {
+        showMessage("success", "Profile image updated!");
+        fetchProfile();
+      }
     } catch (err) {
+      console.error("Avatar upload error:", err);
       showMessage("error", "Image upload failed");
       // Revert preview on error
       setAvatar(null);
+      URL.revokeObjectURL(previewUrl);
     }
   };
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -286,14 +318,35 @@ export default function ManagerProfile() {
           <div className="avatar-section">
             <div className="profile-avatar">
               {avatar ? (
+                // Show preview first (immediate feedback)
                 <img src={avatar} alt="avatar" />
+              ) : authUser?.avatar ? (
+                // Then show authUser avatar (from context, updated immediately)
+                <img
+                  src={authUser.avatar}
+                  alt="avatar"
+                  key={authUser.avatar} // Force re-render when avatar changes
+                  onError={(e) => {
+                    console.log("Avatar failed to load, using fallback");
+                    e.target.style.display = "none";
+                    e.target.parentElement.innerHTML =
+                      profile?.name?.charAt(0)?.toUpperCase() || "U";
+                  }}
+                />
               ) : profile?.avatar ? (
+                // Fallback to profile data
                 <img
                   src={`http://localhost:5000${profile.avatar}`}
                   alt="avatar"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    e.target.parentElement.innerHTML =
+                      profile?.name?.charAt(0)?.toUpperCase() || "U";
+                  }}
                 />
               ) : (
-                profile?.name?.charAt(0)?.toUpperCase()
+                // Show initials as last resort
+                profile?.name?.charAt(0)?.toUpperCase() || "U"
               )}
             </div>
             <button
@@ -319,7 +372,9 @@ export default function ManagerProfile() {
               <Briefcase size={16} />
               <div>
                 <span className="info-label">Employee ID</span>
-                <span className="info-value">{profile?.employeeId || "N/A"}</span>
+                <span className="info-value">
+                  {profile?.employeeId || "N/A"}
+                </span>
               </div>
             </div>
             <div className="info-item">
@@ -336,9 +391,9 @@ export default function ManagerProfile() {
               <div>
                 <span className="info-label">Department</span>
                 <span className="info-value">
-                  {profile?.managedDepartment?.name || 
-                   profile?.department || 
-                   "Not assigned"}
+                  {profile?.managedDepartment?.name ||
+                    profile?.department ||
+                    "Not assigned"}
                 </span>
               </div>
             </div>
@@ -739,17 +794,17 @@ export default function ManagerProfile() {
                   <div className="info-row">
                     <span className="label">Department</span>
                     <span className="value">
-                      {profile?.managedDepartment?.name || 
-                       profile?.employmentDetails?.department?.name ||
-                       "Not assigned"}
+                      {profile?.managedDepartment?.name ||
+                        profile?.employmentDetails?.department?.name ||
+                        "Not assigned"}
                     </span>
                   </div>
                   <div className="info-row">
                     <span className="label">Designation</span>
                     <span className="value">
                       {profile?.employmentDetails?.designation ||
-                       profile?.designation ||
-                       "Not assigned"}
+                        profile?.designation ||
+                        "Not assigned"}
                     </span>
                   </div>
                   <div className="info-row">
@@ -766,7 +821,7 @@ export default function ManagerProfile() {
                     <span className="label">Employment Type</span>
                     <span className="value employment-type">
                       {profile?.employmentDetails?.employmentType ||
-                       "Not specified"}
+                        "Not specified"}
                     </span>
                   </div>
                 </div>

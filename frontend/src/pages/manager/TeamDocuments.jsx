@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import api from '../../services/api';
-import { useAuth } from "../../context/AuthContext";
+
 import { 
   FileText,
   CheckCircle,
@@ -18,7 +18,6 @@ import {
 import "./TeamDocuments.css";
 
 export default function TeamDocuments() {
-  const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [filteredDocs, setFilteredDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,12 +66,44 @@ export default function TeamDocuments() {
     }
   };
 
+  // ✅ FIXED: Team members fetch function
   const fetchTeamMembers = async () => {
     try {
-      const res = await api.get("/employees/team");
-      setEmployees(res.data.employees || []);
+      console.log('📋 Fetching team members...');
+      
+      // Try multiple endpoints
+      let response;
+      try {
+        // Pehle manager endpoint try karo
+        response = await api.get("/managers/employees/team");
+      } catch (err1) {
+        console.log('First endpoint failed, trying alternative...');
+        try {
+          // Dusra endpoint try karo
+          response = await api.get("/managers/team/members");
+        } catch (err2) {
+          console.log('Second endpoint failed, trying third...');
+          // Teesra endpoint try karo
+          response = await api.get("/employees/team");
+        }
+      }
+      
+      // Handle different response structures
+      if (response.data.employees) {
+        setEmployees(response.data.employees);
+        console.log(`✅ Found ${response.data.employees.length} team members`);
+      } else if (response.data.team) {
+        setEmployees(response.data.team);
+      } else if (Array.isArray(response.data)) {
+        setEmployees(response.data);
+      } else {
+        setEmployees([]);
+      }
+      
     } catch (error) {
-      console.error("Error fetching team members:", error);
+      console.error("❌ Error fetching team members:", error);
+      setEmployees([]); // Empty array set karo UI break na ho
+      showMessage("error", "Could not load team members list");
     }
   };
 
@@ -252,6 +283,7 @@ export default function TeamDocuments() {
     });
   };
 
+  // Rest of the JSX remains exactly the same...
   return (
     <div className="team-documents-container">
       {/* Header */}

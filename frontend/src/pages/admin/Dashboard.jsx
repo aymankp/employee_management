@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../services/api";
-import socket from "../../socket";
+import socketService from '../../services/socket'; // Changed from 'socket' to 'socketService'
 import { useAuth } from "../../context/AuthContext";
 import {
   Chart as ChartJS,
@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Clock,
 } from "lucide-react";
+import "./Dashboard.css";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -38,13 +39,13 @@ export default function EmployeeDashboard() {
   const [balance, setBalance] = useState(null);
   const [leaveType, setLeaveType] = useState("");
   const today = new Date().toISOString().split("T")[0];
-  const managerId = authUser?.manager;
+  const managerId = authUser?.manager?._id || authUser?.manager;
 
   // ========== DATA FETCHING ==========
   const fetchMyLeaves = useCallback(async () => {
     try {
       const res = await api.get("/leave/my");
-      setLeaves(res.data);
+      setLeaves(res.data || []);
     } catch (error) {
       console.error("Error fetching leaves:", error);
     }
@@ -53,7 +54,7 @@ export default function EmployeeDashboard() {
   const fetchBalance = useCallback(async () => {
     try {
       const res = await api.get("/auth/me");
-      setBalance(res.data.leaveBalance);
+      setBalance(res.data.leaveBalance || res.data.profile?.leaveBalance);
     } catch (error) {
       console.error("Error fetching balance:", error);
     }
@@ -74,12 +75,17 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     const loadAllData = async () => {
       setPageLoading(true);
-      await Promise.all([
-        fetchMyLeaves(),
-        fetchBalance(),
-        fetchManagerStatus(),
-      ]);
-      setPageLoading(false);
+      try {
+        await Promise.all([
+          fetchMyLeaves(),
+          fetchBalance(),
+          fetchManagerStatus(),
+        ]);
+      } catch (error) {
+        console.error("Error loading data:", error);
+      } finally {
+        setPageLoading(false);
+      }
     };
 
     loadAllData();
@@ -93,9 +99,10 @@ export default function EmployeeDashboard() {
     }
 
     console.log("Connecting socket for manager:", managerId);
-    socket.connect();
+    socketService.connect(authUser?._id); // Connect with employee's own ID
 
-    socket.on("status-update", (data) => {
+    // Listen for manager status updates
+    socketService.on("status-update", (data) => {
       console.log("Status update received:", data);
       if (String(data.userId) === String(managerId)) {
         if (data.idle) {
@@ -116,14 +123,16 @@ export default function EmployeeDashboard() {
     });
 
     return () => {
-      socket.off("status-update");
-      socket.disconnect();
+      socketService.off("status-update");
+      // Don't disconnect here - let App.js handle it
     };
-  }, [managerId]);
+  }, [managerId, authUser?._id]);
 
   // ========== CHART CALCULATIONS ==========
   const usedCasual = balance?.casual?.used || 0;
   const usedSick = balance?.sick?.used || 0;
+  const totalCasual = balance?.casual?.total || 0;
+  const totalSick = balance?.sick?.total || 0;
 
   const chartData = {
     labels: ["Casual", "Sick"],
@@ -131,7 +140,7 @@ export default function EmployeeDashboard() {
       {
         label: "Used Leaves",
         data: [usedCasual, usedSick],
-        bbackgroundColor: ["#3b82f6", "#ef4444"],
+        backgroundColor: ["#3b82f6", "#ef4444"], // Fixed typo: 'bbackgroundColor' -> 'backgroundColor'
         borderRadius: 6,
       },
     ],
@@ -139,24 +148,28 @@ export default function EmployeeDashboard() {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
     },
     scales: {
       x: {
         ticks: {
-          color: "#cbd5f5",
+          color: "#64748b",
         },
         grid: {
-          color: "#334155",
+          color: "#e2e8f0",
         },
       },
       y: {
+        beginAtZero: true,
+        max: Math.max(totalCasual, totalSick, 5),
         ticks: {
-          color: "#cbd5f5",
+          color: "#64748b",
+          stepSize: 1,
         },
         grid: {
-          color: "#334155",
+          color: "#e2e8f0",
         },
       },
     },
@@ -170,10 +183,33 @@ export default function EmployeeDashboard() {
       alert("All fields are required");
       return;
     }
-    if (new Date(toDate) < new Date(fromDate)) {
+    
+    // Validate dates
+    const todayDate = new Date(today);
+    const fromDateObj = new Date(fromDate);
+    const toDateObj = new Date(toDate);
+    
+    if (fromDateObj < todayDate) {
+      alert("From date cannot be in the past");
+      return;
+    }
+    
+    if (toDateObj < fromDateObj) {
       alert("To date cannot be before From date");
       return;
     }
+
+    // Check leave balance
+    const days = Math.ceil((toDateObj - fromDateObj) / (1000 * 60 * 60 * 24)) + 1;
+    if (leaveType === 'casual' && usedCasual + days > totalCasual) {
+      alert(`Insufficient casual leave balance. Available: ${totalCasual - usedCasual} days`);
+      return;
+    }
+    if (leaveType === 'sick' && usedSick + days > totalSick) {
+      alert(`Insufficient sick leave balance. Available: ${totalSick - usedSick} days`);
+      return;
+    }
+
     setLoading(true);
     try {
       await api.post("/leave/apply", {
@@ -183,14 +219,19 @@ export default function EmployeeDashboard() {
         leaveType,
       });
 
+      // Reset form
       setFromDate("");
       setToDate("");
       setReason("");
       setLeaveType("");
+      
+      // Refresh data
       await Promise.all([fetchMyLeaves(), fetchBalance()]);
+      
+      alert("Leave applied successfully!");
     } catch (error) {
       console.error("Error applying leave:", error);
-      alert("Failed to apply leave");
+      alert(error.response?.data?.message || "Failed to apply leave");
     } finally {
       setLoading(false);
     }
@@ -241,15 +282,9 @@ export default function EmployeeDashboard() {
   // ========== LOADING STATE ==========
   if (pageLoading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "400px",
-        }}
-      >
+      <div className="loading-container">
         <div className="spinner"></div>
+        <p>Loading your dashboard...</p>
       </div>
     );
   }
@@ -298,10 +333,10 @@ export default function EmployeeDashboard() {
               </p>
               <div className="stat-details">
                 <span className="stat-detail">
-                  Casual: {balance.casual?.total || 0}
+                  Casual: {balance.casual?.total || 0} (Used: {balance.casual?.used || 0})
                 </span>
                 <span className="stat-detail">
-                  Sick: {balance.sick?.total || 0}
+                  Sick: {balance.sick?.total || 0} (Used: {balance.sick?.used || 0})
                 </span>
               </div>
             </div>
@@ -344,7 +379,7 @@ export default function EmployeeDashboard() {
                 <span className="status-offline">● Offline</span>
               )}
             </p>
-            {lastSeen && (
+            {lastSeen && !managerOnline && (
               <div className="stat-details">
                 <Clock size={12} />
                 <span className="stat-detail">
@@ -373,7 +408,7 @@ export default function EmployeeDashboard() {
             </div>
             <div className="stat-content">
               <h3>Leave Usage</h3>
-              <div style={{ height: "120px", marginTop: "10px" }}>
+              <div className="chart-container" style={{ height: "120px", marginTop: "10px" }}>
                 <Bar data={chartData} options={chartOptions} />
               </div>
             </div>
@@ -414,7 +449,7 @@ export default function EmployeeDashboard() {
                   type="date"
                   className="form-control"
                   value={toDate}
-                  min={today}
+                  min={fromDate || today}
                   onChange={(e) => setToDate(e.target.value)}
                   required
                 />
@@ -455,7 +490,7 @@ export default function EmployeeDashboard() {
 
             <button
               type="submit"
-              className="btn btn-primary btn-block"
+              className="btn btn-primary"
               disabled={loading}
             >
               {loading ? "Applying..." : "Apply for Leave"}
@@ -490,7 +525,7 @@ export default function EmployeeDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leaves.map((leave) => (
+                  {leaves.slice(0, 5).map((leave) => ( // Show only 5 most recent
                     <tr key={leave._id}>
                       <td>{new Date(leave.fromDate).toLocaleDateString()}</td>
                       <td>{new Date(leave.toDate).toLocaleDateString()}</td>
@@ -499,12 +534,21 @@ export default function EmployeeDashboard() {
                           {leave.leaveType}
                         </span>
                       </td>
-                      <td>{leave.reason}</td>
+                      <td className="reason-cell">
+                        {leave.reason && leave.reason.length > 40 
+                          ? `${leave.reason.substring(0, 40)}...` 
+                          : leave.reason}
+                      </td>
                       <td>{getStatusBadge(leave.status)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {leaves.length > 5 && (
+                <div className="view-more">
+                  <button className="btn btn-link">View All History →</button>
+                </div>
+              )}
             </div>
           )}
         </div>
