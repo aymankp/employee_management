@@ -7,7 +7,8 @@ const {
   uploadManagerAvatar,
   getTeamMembers,
   getTeamMemberDetails,
-  getTeamStats
+  getTeamStats,
+  getTeamEmployees  
 } = require('../controllers/managerController.js');
 
 // Import both protect and authorize
@@ -49,6 +50,12 @@ router.use(protect);
 router.get('/me', authorize('manager', 'admin'), getManagerProfile);
 router.put('/me', authorize('manager', 'admin'), updateManagerProfile);
 router.put('/me/avatar', authorize('manager', 'admin'), upload.single('avatar'), uploadManagerAvatar);
+
+
+// IMPORTANT: Team employees endpoint 
+router.get('/employees/team', authorize('manager', 'admin'), getTeamEmployees);
+router.get('/team/members', authorize('manager', 'admin'), getTeamEmployees); // Backup
+router.get('/team/list', authorize('manager', 'admin'), getTeamEmployees);    // Backup
 
 // Team routes - only accessible by managers and admins
 router.get('/team', authorize('manager', 'admin'), getTeamMembers);

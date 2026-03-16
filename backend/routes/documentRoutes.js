@@ -40,6 +40,14 @@ const upload = multer({
 // ===== FILE ACCESS ROUTES (TOP PE RAKHO) =====
 router.get("/file/view/:id", protect, documentController.viewDocument);
 router.get("/file/download/:id", protect, documentController.downloadDocument);
+
+// ========== 🔥 NEW TEAM ROUTE - YEH ADD KARO ==========
+router.get('/team', 
+  protect, 
+  isManager, 
+  documentController.getTeamDocuments
+);
+
 // ========== EMPLOYEE ROUTES ==========
 router.post('/upload', 
   protect, 
@@ -93,7 +101,5 @@ router.put('/:id/verify',
   isAdmin, 
   documentController.verifyDocument
 );
-
-
 
 module.exports = router;

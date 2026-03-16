@@ -2,11 +2,11 @@ const { classifyLeave, getApprovalRisk } = require("../services/aiService");
 const Leave = require("../models/Leave");
 const User = require("../models/User");
 
+// ========== EXISTING FUNCTIONS (Keep these) ==========
 const applyLeave = async (req, res) => {
   try {
     const { fromDate, toDate, reason, leaveType } = req.body;
 
-    // fallback to AI only if user didn't select type
     let finalType = leaveType;
 
     if (!finalType) {
@@ -22,7 +22,7 @@ const applyLeave = async (req, res) => {
       fromDate,
       toDate,
       reason,
-      leaveType,
+      leaveType: finalType,
       status: "pending",
     });
 
@@ -30,7 +30,6 @@ const applyLeave = async (req, res) => {
       message: "Leave applied successfully",
       leave,
     });
-
   } catch (error) {
     console.error("APPLY LEAVE ERROR:", error);
     res.status(500).json({ message: error.message });
@@ -46,22 +45,21 @@ const getMyLeaves = async (req, res) => {
     res.status(200).json(leaves);
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
+// ========== FIXED: Match frontend URL pattern ==========
 const updateLeaveStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const { id } = req.params;
+    const { leaveId } = req.params;  // Changed from 'id' to 'leaveId'
 
     if (!["approved", "rejected"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
-    const leave = await Leave.findById(id).populate("employee");
+    const leave = await Leave.findById(leaveId).populate("employee");
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }
@@ -70,12 +68,18 @@ const updateLeaveStatus = async (req, res) => {
       return res.status(400).json({ message: "Leave already approved" });
     }
 
-    if (status === "approved") {
-      // 🔥 FIX: Pehle employee ki team find karo
-      const employee = leave.employee;
-      const team = employee.team;
+    // Check if current user is authorized (manager of this employee)
+    const employee = leave.employee;
+    if (req.user.role === 'manager' && 
+        employee.employmentDetails?.reportingTo?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        message: "Not authorized to manage this employee's leaves" 
+      });
+    }
 
-      // Same team ki overlapping leaves find karo
+    if (status === "approved") {
+      // Check team overlap
+      const team = employee.team;
       const overlappingLeaves = await Leave.find({
         _id: { $ne: leave._id },
         status: "approved",
@@ -83,26 +87,22 @@ const updateLeaveStatus = async (req, res) => {
         toDate: { $gte: leave.fromDate }
       }).populate({
         path: 'employee',
-        match: { team: team }   // 👈 Sirf same team ke employees
+        match: { team: team }
       });
 
-      // Sirf wahi leaves count karo jinka employee same team ka ho
       const teamOverlapCount = overlappingLeaves.filter(l => l.employee !== null).length;
-
       const MAX_TEAM_LEAVE = 2;
 
       if (teamOverlapCount >= MAX_TEAM_LEAVE) {
         return res.status(400).json({
-          message: "Conflict: Too many team members already on leave during these dates",
+          message: "Too many team members already on leave during these dates",
         });
       }
 
-      // Days calculate karo
+      // Check leave balance
       const days = Math.ceil((new Date(leave.toDate) - new Date(leave.fromDate)) / (1000 * 60 * 60 * 24)) + 1;
-
-      const user = leave.employee;
       const type = leave.leaveType.toLowerCase();
-      const balanceData = user.leaveBalance?.[type];
+      const balanceData = employee.leaveBalance?.[type];
 
       if (!balanceData) {
         return res.status(400).json({ message: "Invalid leave type" });
@@ -113,11 +113,10 @@ const updateLeaveStatus = async (req, res) => {
         return res.status(400).json({ message: "Insufficient leave balance" });
       }
 
-      // Leave balance deduct karo
+      // Deduct balance
       balanceData.used += days;
-      await user.save();
+      await employee.save();
 
-      // Leave ko approve karo
       leave.approvedBy = req.user._id;
     }
 
@@ -128,42 +127,69 @@ const updateLeaveStatus = async (req, res) => {
       message: `Leave ${status} successfully`,
       leave,
     });
-
   } catch (error) {
     console.error("UPDATE LEAVE ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-const getPendingLeaves = async (req, res) => {
+// ========== NEW: Get team pending leaves ==========
+const getTeamPendingLeaves = async (req, res) => {
   try {
-    const leaves = await Leave.find({ status: "pending" })
-      .populate("employee", "name email")
-      .sort({ createdAt: -1 });
+    const manager = await User.findById(req.user._id);
+    
+    // Find all employees reporting to this manager
+    const teamMembers = await User.find({ 
+      'employmentDetails.reportingTo': req.user._id,
+      role: 'employee'
+    }).select('_id');
 
-    res.status(200).json(leaves);
+    const teamMemberIds = teamMembers.map(m => m._id);
+
+    // Get pending leaves for team members
+    const leaves = await Leave.find({
+      employee: { $in: teamMemberIds },
+      status: 'pending'
+    })
+    .populate('employee', 'name email avatar team employmentDetails')
+    .sort('-createdAt');
+
+    // Format response to match frontend expectations
+    const formattedLeaves = leaves.map(leave => ({
+      _id: leave._id,
+      employee: {
+        _id: leave.employee._id,
+        name: leave.employee.name,
+        email: leave.employee.email,
+        avatar: leave.employee.avatar
+      },
+      leaveType: leave.leaveType,
+      fromDate: leave.fromDate,
+      toDate: leave.toDate,
+      reason: leave.reason,
+      status: leave.status,
+      appliedAt: leave.appliedAt,
+      totalDays: leave.totalDays
+    }));
+
+    res.json(formattedLeaves);
   } catch (error) {
-    console.error("PENDING LEAVES ERROR:", error);
-    res.status(500).json({
-      message: error.message,
-    });
+    console.error("Get team pending leaves error:", error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-//organised data for ai
-const getLeaveRecommendation = async (req, res) => {
+// ========== FIXED: Match frontend URL pattern for analysis ==========
+const getLeaveAnalysis = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { leaveId } = req.params;  // Changed from 'id' to 'leaveId'
 
-    const leave = await Leave.findById(id).populate("employee");
+    const leave = await Leave.findById(leaveId).populate("employee");
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }
 
-    const days =
-      (new Date(leave.toDate) - new Date(leave.fromDate)) /
-      (1000 * 60 * 60 * 24) +
-      1;
+    const days = Math.ceil((new Date(leave.toDate) - new Date(leave.fromDate)) / (1000 * 60 * 60 * 24)) + 1;
 
     // Past 6 months leave count
     const sixMonthsAgo = new Date();
@@ -180,38 +206,134 @@ const getLeaveRecommendation = async (req, res) => {
       status: "approved",
       fromDate: { $lte: leave.toDate },
       toDate: { $gte: leave.fromDate },
+    }).populate({
+      path: 'employee',
+      match: { team: leave.employee.team }
     });
 
     const type = leave.leaveType.toLowerCase();
-    const balanceData = leave.employee.leaveBalance[type];
+    const balanceData = leave.employee.leaveBalance?.[type] || { total: 0, used: 0 };
     const balance = balanceData.total - balanceData.used;
-
 
     const risk = await getApprovalRisk({
       leaveCount: pastLeaves,
       days,
-      teamLoad: teamOverlap,
+      teamLoad: teamOverlap.filter(l => l.employee).length,
       balance,
     });
 
-    leave.approvalRisk = risk;
-    await leave.save();
+    // Store risk in leave (optional)
+    await Leave.findByIdAndUpdate(leaveId, {
+      approvalRisk: risk,
+    });
 
-    res.json({ risk });
-
+    res.json({ 
+      risk: risk || 'Medium',  // Default if not set
+      reasons: generateRiskReasons(risk, { pastLeaves, teamOverlap, balance, days })
+    });
   } catch (error) {
     console.error("AI RISK ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
+// Helper function for risk reasons
+const generateRiskReasons = (risk, data) => {
+  const reasons = [];
+  if (data.pastLeaves > 3) reasons.push('Frequent leaves in last 6 months');
+  if (data.teamOverlap > 1) reasons.push('Multiple team members on leave');
+  if (data.balance < data.days) reasons.push('Low leave balance');
+  return reasons;
+};
+
+// ========== NEW: Bulk status update ==========
+const bulkUpdateLeaveStatus = async (req, res) => {
+  try {
+    const { leaveIds, status } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const manager = await User.findById(req.user._id);
+    
+    // Get all employees under this manager
+    const teamMembers = await User.find({ 
+      'employmentDetails.reportingTo': req.user._id 
+    }).select('_id');
+
+    const teamMemberIds = teamMembers.map(m => m._id);
+
+    // Verify all leaves belong to manager's team
+    const leaves = await Leave.find({
+      _id: { $in: leaveIds },
+      employee: { $in: teamMemberIds }
+    }).populate('employee');
+
+    if (leaves.length !== leaveIds.length) {
+      return res.status(403).json({ 
+        message: 'Some leaves are not from your team members' 
+      });
+    }
+
+    // Update all leaves
+    const updateResult = await Leave.updateMany(
+      { _id: { $in: leaveIds } },
+      { 
+        $set: { 
+          status,
+          approvedBy: req.user._id,
+          approvedAt: Date.now()
+        } 
+      }
+    );
+
+    // Update leave balances for approved leaves
+    if (status === 'approved') {
+      for (const leave of leaves) {
+        const days = Math.ceil((new Date(leave.toDate) - new Date(leave.fromDate)) / (1000 * 60 * 60 * 24)) + 1;
+        const type = leave.leaveType.toLowerCase();
+        if (leave.employee.leaveBalance?.[type]) {
+          leave.employee.leaveBalance[type].used += days;
+          await leave.employee.save();
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${updateResult.modifiedCount} leaves ${status} successfully`
+    });
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Keep existing functions
+const getPendingLeaves = async (req, res) => {
+  try {
+    const leaves = await Leave.find({ status: "pending" })
+      .populate("employee", "name email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(leaves);
+  } catch (error) {
+    console.error("PENDING LEAVES ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Alias for backward compatibility
+const getLeaveRecommendation = getLeaveAnalysis;
 
 module.exports = {
   applyLeave,
   getMyLeaves,
   updateLeaveStatus,
   getPendingLeaves,
-  getLeaveRecommendation
+  getLeaveRecommendation,
+  getTeamPendingLeaves,
+  getLeaveAnalysis,
+  bulkUpdateLeaveStatus
 };
-
-

@@ -5,31 +5,31 @@ const User = require('../models/User.js');
 // @access  Private (Manager/Admin)
 const getManagerProfile = async (req, res) => {
   try {
-    const manager = await User.findById(req.user.id)
+    const manager = await User.findById(req.user._id)
       .select('-password')
-      .populate('managedDepartment', 'name description')
-      .populate('department', 'name');
+      .populate('employmentDetails.department', 'name description');
 
     if (!manager) {
       return res.status(404).json({ message: 'Manager not found' });
     }
 
-    // Get all employees managed by this manager
+    // FIXED: Use reportingTo instead of manager
     const managedEmployees = await User.find({ 
-      manager: req.user.id,
+      'employmentDetails.reportingTo': req.user._id,
       role: 'employee' 
     })
-    .select('name email avatar role status personalInfo employmentDetails')
-    .populate('department', 'name');
+    .select('name email avatar role isActive personalInfo employmentDetails')
+    .populate('employmentDetails.department', 'name');
 
-    // Get pending leave requests for team
-    const pendingLeaves = await getPendingLeaveRequests(req.user.id);
+    // Get pending leave requests for team (you'll need to implement this)
+    const pendingLeaves = await getPendingLeaveRequests(req.user._id);
 
     const managerData = manager.toObject();
     managerData.managedEmployees = managedEmployees;
     managerData.teamStats = {
       totalMembers: managedEmployees.length,
-      activeMembers: managedEmployees.filter(emp => emp.status === 'active').length,
+      // FIXED: Use isActive instead of status
+      activeMembers: managedEmployees.filter(emp => emp.isActive === true).length,
       pendingLeaves: pendingLeaves
     };
 
@@ -61,7 +61,7 @@ const updateManagerProfile = async (req, res) => {
     if (emergencyContact) updateFields.emergencyContact = emergencyContact;
 
     const updatedManager = await User.findByIdAndUpdate(
-      req.user.id,
+      req.user._id,
       { $set: updateFields },
       { new: true, runValidators: true }
     ).select('-password');
@@ -95,7 +95,7 @@ const uploadManagerAvatar = async (req, res) => {
     const avatarPath = `/uploads/${req.file.filename}`;
     
     const updatedManager = await User.findByIdAndUpdate(
-      req.user.id,
+      req.user._id,
       { avatar: avatarPath },
       { new: true }
     ).select('-password');
@@ -120,12 +120,12 @@ const uploadManagerAvatar = async (req, res) => {
 // @access  Private (Manager/Admin)
 const getTeamMembers = async (req, res) => {
   try {
-    const manager = await User.findById(req.user.id);
+    const manager = await User.findById(req.user._id);
     
     // Build query based on manager's department or direct reports
     const query = {
       role: 'employee',
-      _id: { $ne: req.user.id }
+      _id: { $ne: req.user._id }
     };
 
     // If manager has managedDepartment, get all employees in that department
@@ -133,7 +133,7 @@ const getTeamMembers = async (req, res) => {
       query.department = manager.managedDepartment;
     } else {
       // Otherwise get employees where this user is the manager
-      query.manager = req.user.id;
+      query.manager = req.user._id;
     }
 
     const teamMembers = await User.find(query)
@@ -178,14 +178,14 @@ const getTeamMemberDetails = async (req, res) => {
       });
     }
 
-    const manager = await User.findById(req.user.id);
+    const manager = await User.findById(req.user._id);
     
     // Check if employee belongs to manager's team
     const employee = await User.findOne({
       _id: employeeId,
       role: 'employee',
       $or: [
-        { manager: req.user.id },
+        { manager: req.user._id },
         { department: manager.managedDepartment }
       ]
     })
@@ -218,17 +218,17 @@ const getTeamMemberDetails = async (req, res) => {
 // @access  Private (Manager/Admin)
 const getTeamStats = async (req, res) => {
   try {
-    const manager = await User.findById(req.user.id);
+    const manager = await User.findById(req.user._id);
     
     const query = {
       role: 'employee',
-      _id: { $ne: req.user.id }
+      _id: { $ne: req.user._id }
     };
 
     if (manager.managedDepartment) {
       query.department = manager.managedDepartment;
     } else {
-      query.manager = req.user.id;
+      query.manager = req.user._id;
     }
 
     const teamMembers = await User.find(query);
@@ -286,12 +286,47 @@ const getPendingLeaveRequests = async (managerId) => {
     return 0;
   }
 };
+// FILE: controllers/managerController.js
+// END OF FILE - YE FUNCTION ADD KARO (agar nahi hai)
 
+// @desc    Get team employees list for dropdown
+// @route   GET /api/managers/employees/team
+// @access  Private (Manager/Admin)
+const getTeamEmployees = async (req, res) => {
+  try {
+    // Find all employees reporting to this manager
+    const teamMembers = await User.find({ 
+      'employmentDetails.reportingTo': req.user._id,
+      role: 'employee' 
+    })
+    .select('_id name email avatar department team')
+    .lean();
+
+    // Always return 200 with array
+    res.status(200).json({
+      success: true,
+      employees: teamMembers || [],
+      count: teamMembers.length
+    });
+    
+  } catch (error) {
+    console.error('Get team employees error:', error);
+    // Return 200 with empty array, never 400
+    res.status(200).json({
+      success: false,
+      employees: [],
+      message: error.message
+    });
+  }
+};
+
+// Make sure it's exported
 module.exports = {
   getManagerProfile,
   updateManagerProfile,
   uploadManagerAvatar,
   getTeamMembers,
   getTeamMemberDetails,
-  getTeamStats
+  getTeamStats,
+  getTeamEmployees  
 };

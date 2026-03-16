@@ -4,6 +4,96 @@ const User = require('../models/User');
 const path = require('path');
 const fs = require('fs');
 
+// ========== 🔥 NEW FUNCTION - GET TEAM DOCUMENTS ==========
+// @desc    Get all documents from team members
+// @route   GET /api/documents/team
+// @access  Private (Manager/Admin)
+const getTeamDocuments = async (req, res) => {
+  try {
+    console.log('📄 Getting team documents for manager:', req.user._id);
+    
+    // Find all employees reporting to this manager
+    const teamMembers = await User.find({ 
+      'employmentDetails.reportingTo': req.user._id,
+      role: 'employee'
+    }).select('_id name email department team');
+
+    const teamMemberIds = teamMembers.map(m => m._id);
+    console.log(`👥 Found ${teamMemberIds.length} team members`);
+
+    // If no team members, return empty array
+    if (teamMemberIds.length === 0) {
+      return res.json({
+        success: true,
+        documents: [],
+        message: 'No team members found'
+      });
+    }
+
+    // Get query parameters for filtering
+    const { category, documentType, verificationStatus } = req.query;
+
+    // Build filter
+    const filter = {
+      employee: { $in: teamMemberIds },
+      isActive: true
+    };
+
+    if (category) filter.category = category;
+    if (documentType) filter.documentType = documentType;
+    if (verificationStatus) filter.verificationStatus = verificationStatus;
+
+    // Get documents uploaded by team members
+    const documents = await Document.find(filter)
+      .populate('employee', 'name email avatar department team')
+      .populate('uploadedBy', 'name email')
+      .populate('verifiedBy', 'name email')
+      .sort('-createdAt');
+
+    console.log(`📊 Found ${documents.length} team documents`);
+
+    // Group documents by employee
+    const groupedByEmployee = documents.reduce((acc, doc) => {
+      const employeeId = doc.employee._id.toString();
+      if (!acc[employeeId]) {
+        acc[employeeId] = {
+          employee: doc.employee,
+          documents: []
+        };
+      }
+      acc[employeeId].documents.push(doc);
+      return acc;
+    }, {});
+
+    // Get statistics
+    const stats = {
+      totalDocuments: documents.length,
+      totalEmployees: teamMembers.length,
+      pendingVerification: documents.filter(d => d.verificationStatus === 'pending').length,
+      verified: documents.filter(d => d.verificationStatus === 'verified').length,
+      rejected: documents.filter(d => d.verificationStatus === 'rejected').length,
+      expiringSoon: documents.filter(d => {
+        if (!d.expiryDate) return false;
+        const daysUntilExpiry = Math.ceil((new Date(d.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+        return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+      }).length
+    };
+
+    res.json({
+      success: true,
+      stats,
+      groupedByEmployee: Object.values(groupedByEmployee),
+      documents
+    });
+  } catch (error) {
+    console.error('❌ Get team documents error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
 // @desc    Upload document
 // @route   POST /api/documents/upload
 // @access  Private
@@ -482,6 +572,7 @@ const downloadDocument = async (req, res) => {
   }
 };
 
+// ========== UPDATE EXPORTS ==========
 module.exports = {
   uploadDocument,
   getMyDocuments,
@@ -493,5 +584,6 @@ module.exports = {
   deleteDocument,
   getExpiringDocuments,
   viewDocument,
-  downloadDocument
+  downloadDocument,
+  getTeamDocuments  // ✅ ADD THIS!
 };
