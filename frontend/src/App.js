@@ -1,10 +1,6 @@
-import React from 'react';
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { useEffect, useRef } from 'react'; // Added useRef
-
-// Import socket service
-import socketService from './services/socket'; // <-- ADD THIS IMPORT
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -28,10 +24,12 @@ import Reports from './pages/manager/Reports';
 import ManagerProfile from './pages/manager/Profile';
 
 // Admin Pages
-import AdminDashboard from './pages/admin/Dashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import Employees from './pages/admin/Employees';
 import Departments from './pages/admin/Departments';
 import Settings from './pages/admin/Settings';
+import EmployeeDetails from "./pages/admin/EmployeeDetails";
+
 
 const LoadingSpinner = () => (
   <div style={{
@@ -55,26 +53,19 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {
-    return <Navigate to={`/${role}`} replace />;
+    // fallback based on role
+    if (role === "admin") return <Navigate to="/admin" replace />;
+    if (role === "manager") return <Navigate to="/manager" replace />;
+    if (role === "employee") return <Navigate to="/employee" replace />;
+
+    return <Navigate to="/login" replace />;
   }
 
   return children;
 };
 
 function AppRoutes() {
-  const { isAuthenticated, role, user } = useAuth(); // Added user
-  const socketInitialized = useRef(false); // Add this ref to track socket connection
-  // Theme effect
-  useEffect(() => {
-    if (!role) return;
-    const savedTheme = localStorage.getItem(`${role}-theme`);
-    if (savedTheme === "dark") {
-      document.body.classList.add("dark");
-    } else {
-      document.body.classList.remove("dark");
-    }
-  }, [role]);
-
+  const { isAuthenticated, role } = useAuth(); // Added user
   return (
     <Routes>
       {/* LOGIN */}
@@ -82,13 +73,18 @@ function AppRoutes() {
         path="/login"
         element={
           isAuthenticated
-            ? <Navigate to={`/${role}`} replace />
+            ? (
+              role === "admin" ? <Navigate to="/admin" replace /> :
+                role === "manager" ? <Navigate to="/manager" replace /> :
+                  <Navigate to="/employee" replace />
+            )
             : <Login />
         }
       />
 
       {/* DEFAULT */}
       <Route path="/" element={<Navigate to="/login" replace />} />
+
 
       {/* EMPLOYEE */}
       <Route
@@ -138,6 +134,7 @@ function AppRoutes() {
         <Route path="all-leaves" element={<LeaveHistory />} />
         <Route path="all-documents" element={<Documents />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="/admin/employees/:id" element={<EmployeeDetails />} />
       </Route>
 
       {/* FALLBACK */}

@@ -144,7 +144,7 @@ export default function Employees() {
       const res = await api.post("/admin/add-employee", {
         name: formData.name,
         email: formData.email,
-        password: formData.password || "Test@123",
+        password: formData.password || "123456",
         role: formData.role,
         team: formData.team,
         phone: formData.phone,
