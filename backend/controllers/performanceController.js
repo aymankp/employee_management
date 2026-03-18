@@ -1,6 +1,6 @@
 const PerformanceReview = require('../models/PerformanceReview');
 const User = require('../models/User');
-
+const mongoose = require("mongoose");
 // @desc    Create new review cycle (Manager/Admin)
 // @route   POST /api/performance/cycle
 // @access  Manager/Admin
@@ -170,7 +170,7 @@ const submitManagerReview = async (req, res) => {
     // Update ratings
     if (ratings) {
       review.ratings = { ...review.ratings, ...ratings };
-      
+
       // Calculate overall average
       const ratingValues = Object.values(review.ratings).filter(r => typeof r === 'number');
       if (ratingValues.length > 0) {
@@ -291,10 +291,10 @@ const getTeamReviews = async (req, res) => {
     const { year, quarter, status } = req.query;
 
     let employeeFilter = {};
-    
+
     // If manager, only show their team
     if (req.user.role === 'manager') {
-      const teamMembers = await User.find({ 
+      const teamMembers = await User.find({
         team: req.user.team,
         role: 'employee'
       }).select('_id');
@@ -330,9 +330,21 @@ const getTeamReviews = async (req, res) => {
 // @desc    Get review by ID
 // @route   GET /api/performance/:id
 // @access  Private (owner or manager)
+
+
 const getReviewById = async (req, res) => {
   try {
-    const review = await PerformanceReview.findById(req.params.id)
+    const { id } = req.params;
+    console.log("ID RECEIVED:", req.params.id);
+    // 🛑 guard
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid review ID"
+      });
+    }
+
+    const review = await PerformanceReview.findById(id)
       .populate('employee', 'name email employeeId team')
       .populate('reviewer', 'name email')
       .populate('createdBy', 'name email')
@@ -345,7 +357,6 @@ const getReviewById = async (req, res) => {
       });
     }
 
-    // Check authorization
     const isEmployee = review.employee._id.toString() === req.user._id.toString();
     const isReviewer = review.reviewer._id.toString() === req.user._id.toString();
     const isManager = req.user.role === 'manager' && review.employee.team === req.user.team;
@@ -354,7 +365,7 @@ const getReviewById = async (req, res) => {
     if (!isEmployee && !isReviewer && !isManager && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to view this review'
+        message: 'Not authorized'
       });
     }
 
@@ -362,8 +373,26 @@ const getReviewById = async (req, res) => {
       success: true,
       review
     });
+
   } catch (error) {
     console.error('Get review error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+const getReviewsByStatus = async (req, res) => {
+  try {
+    const { status } = req.params;
+
+    const reviews = await PerformanceReview.find({ status });
+
+    res.json({
+      success: true,
+      reviews
+    });
+  } catch (error) {
     res.status(500).json({
       success: false,
       message: error.message
@@ -379,5 +408,6 @@ module.exports = {
   acknowledgeReview,
   getMyReviews,
   getTeamReviews,
-  getReviewById
+  getReviewById,
+  getReviewsByStatus
 };

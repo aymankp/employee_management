@@ -4,7 +4,7 @@ const router = express.Router();
 
 const { protect } = require("../middleware/authMiddleware");
 const { isAdmin } = require("../middleware/roleMiddleware");
-
+const { getUserById } = require("../controllers/employeeController");
 const {
   addEmployee,
   getAllUsers,
@@ -18,8 +18,9 @@ router.post("/add-employee", protect, isAdmin, addEmployee);
 
 // existing routes
 router.get("/users", protect, isAdmin, getAllUsers);
+router.get("/user/:id", protect, isAdmin, getUserById);
 router.put("/user/:id/role", protect, isAdmin, updateUserRole);
-
+router.get("/user/:id", protect, isAdmin, getUserById);
 // routes/adminRoutes.js
 router.put("/assign-manager", protect, isAdmin, assignManager);
 

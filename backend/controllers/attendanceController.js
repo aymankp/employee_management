@@ -148,6 +148,33 @@ const getTodayStatus = async (req, res) => {
   }
 };
 
+
+const getTodayAttendanceSummary = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const records = await Attendance.find({
+      date: {
+        $gte: today,
+        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+      }
+    });
+    const present = records.filter(r => r.status === "present").length;
+    // total employees
+    const totalEmployees = await User.countDocuments();
+    const absent = totalEmployees - present;
+    res.json({
+      present,
+      absent,
+      total: totalEmployees
+    });
+
+  } catch (error) {
+    console.error("Summary error:", error);
+    res.status(500).json({ message: "Error fetching summary" });
+  }
+};
+
 // @desc    Get My Attendance History
 // @route   GET /api/attendance/my
 // @access  Private
@@ -424,5 +451,6 @@ module.exports = {
   getMyAttendance,
   getTeamAttendance,
   getAttendanceReport,
-  manualAttendance
+  manualAttendance,
+  getTodayAttendanceSummary
 };

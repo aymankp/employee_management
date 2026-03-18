@@ -160,6 +160,27 @@ const getEmployeeById = async (req, res) => {
   }
 };
 
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.json(user);
+
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
 // @desc    Update employee (Admin/Manager only)
 // @route   PUT /api/employees/:id
 // @access  Admin/Manager
@@ -313,6 +334,7 @@ module.exports = {
   updateMyProfile,
   getEmployeeDirectory,
   getEmployeeById,
+  getUserById,
   updateEmployee,
   getEmployeeStats
 };

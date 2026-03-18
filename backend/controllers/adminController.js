@@ -65,7 +65,7 @@ const addEmployee = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const tempPassword = "Test@123"; // later random bana sakte ho
+    const tempPassword = "123456"; 
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     const user = await User.create({
