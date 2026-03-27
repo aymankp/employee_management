@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
-import socketService from "../../services/socket"; 
+import socketService from "../../services/socket";
 import { useAuth } from "../../context/AuthContext";
 import "./Dashboard.css";
 import Widget from "../../components/Dashboard/Widget";
@@ -37,8 +37,8 @@ export default function EmployeeDashboard() {
   const [managerOnline, setManagerOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState(null);
   const [error, setError] = useState(null);
-  const managerId = user?.employmentDetails?.reportingTo;
-console.log("Manager ID:", managerId);
+  const managerId = user?.employmentDetails?.reportingTo?._id;
+
   // ------------------------
   // Fetch Data
   // ------------------------
@@ -52,27 +52,26 @@ console.log("Manager ID:", managerId);
       setError("Failed to load leaves");
     }
   };
- const fetchBalance = async () => {
-  try {
-    const res = await getProfile();
-    setBalance(res.data.leaveBalance);
-  } catch (err) {
-    setError("Failed to load leave balance");
-  }
-};
+  const fetchBalance = async () => {
+    try {
+      const res = await getProfile();
+      setBalance(res.data.leaveBalance);
+    } catch (err) {
+      setError("Failed to load leave balance");
+    }
+  };
 
   const fetchManagerStatus = async () => {
-  if (!managerId) return;
+    if (!managerId) return;
 
-  try {
-    const res = await api.get(`/status/${managerId}`);
-    setManagerOnline(res.data.online);
-    setLastSeen(res.data.lastSeen);
-  } catch (err) {
-    console.error("Manager status fetch failed");
-  }
-};
-
+    try {
+      const res = await api.get(`/status/${managerId}`);
+      setManagerOnline(res.data.online);
+      setLastSeen(res.data.lastSeen);
+    } catch (err) {
+      console.error("Manager status fetch failed");
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -92,22 +91,24 @@ console.log("Manager ID:", managerId);
   // ------------------------
   // Socket realtime manager status
   // ------------------------
-useEffect(() => {
-  if (!managerId) return;
+  useEffect(() => {
+    if (!managerId) return;
 
-  const handler = (data) => {
-    if (String(data.userId) === String(managerId)) {
-      setManagerOnline(data.online);
-      setLastSeen(data.lastSeen);
-    }
-  };
+    const handler = (data) => {
+      console.log("STATUS EVENT:", data);
 
- socketService.on("status-update", handler);
+      if (String(data.userId) === String(managerId)) {
+        setManagerOnline(data.online);
+        setLastSeen(data.lastSeen);
+      }
+    };
 
-return () => {
-  socketService.off("status-update", handler);
-};
-}, [managerId]);
+    socketService.on("status-update", handler);
+
+    return () => {
+      socketService.off("status-update", handler);
+    };
+  }, [managerId]);
 
   // ------------------------
   // Chart
@@ -130,10 +131,10 @@ return () => {
   const emergencyRemaining = emergencyTotal - emergencyUsed;
   const otherRemaining = otherTotal - otherUsed;
 
- const totalRemaining = Math.max(
-  casualRemaining + sickRemaining + emergencyRemaining + otherRemaining,
-  0
-);
+  const totalRemaining = Math.max(
+    casualRemaining + sickRemaining + emergencyRemaining + otherRemaining,
+    0,
+  );
 
   const chartData = useMemo(
     () => ({
@@ -263,7 +264,7 @@ return () => {
           <span className="motivation-text">{word}</span>
         </div>
       </div>
-      
+
       {/* KPI Cards */}
       <div className="stats-grid">
         {loading ? (
@@ -294,7 +295,9 @@ return () => {
               icon={<Users size={22} />}
               title="Manager Status"
               value={
-                managerOnline ? (
+                !managerId ? (
+                  <span className="status-none">No Manager Assigned</span>
+                ) : managerOnline ? (
                   <span className="status-online">
                     <span className="dot1"></span> Online
                   </span>

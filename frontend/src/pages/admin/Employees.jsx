@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import api from '../../services/api';
+import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-import { 
+import {
   Users,
   UserPlus,
   UserCheck,
@@ -21,7 +21,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-} from 'lucide-react';
+} from "lucide-react";
 import "./Employees.css";
 
 export default function Employees() {
@@ -40,25 +40,25 @@ export default function Employees() {
     inactive: 0,
     admins: 0,
     managers: 0,
-    employees: 0
+    employees: 0,
   });
   const [filters, setFilters] = useState({
-    role: 'all',
-    status: 'active',
-    team: 'all',
-    search: ''
+    role: "all",
+    status: "active",
+    team: "all",
+    search: "",
   });
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'employee',
-    team: '',
-    phone: '',
-    designation: '',
-    joiningDate: '',
-    employmentType: 'permanent',
-    isActive: true
+    name: "",
+    email: "",
+    password: "",
+    role: "employee",
+    team: "",
+    phone: "",
+    designation: "",
+    joiningDate: "",
+    employmentType: "permanent",
+    isActive: true,
   });
 
   useEffect(() => {
@@ -86,26 +86,27 @@ export default function Employees() {
   const filterEmployees = () => {
     let filtered = [...employees];
 
-    if (filters.role !== 'all') {
-      filtered = filtered.filter(e => e.role === filters.role);
+    if (filters.role !== "all") {
+      filtered = filtered.filter((e) => e.role === filters.role);
     }
 
-    if (filters.status !== 'all') {
-      filtered = filtered.filter(e => 
-        filters.status === 'active' ? e.isActive : !e.isActive
+    if (filters.status !== "all") {
+      filtered = filtered.filter((e) =>
+        filters.status === "active" ? e.isActive : !e.isActive,
       );
     }
 
-    if (filters.team !== 'all') {
-      filtered = filtered.filter(e => e.team === filters.team);
+    if (filters.team !== "all") {
+      filtered = filtered.filter((e) => e.team === filters.team);
     }
 
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(e => 
-        e.name?.toLowerCase().includes(searchLower) ||
-        e.email?.toLowerCase().includes(searchLower) ||
-        e.employeeId?.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(
+        (e) =>
+          e.name?.toLowerCase().includes(searchLower) ||
+          e.email?.toLowerCase().includes(searchLower) ||
+          e.employeeId?.toLowerCase().includes(searchLower),
       );
     }
 
@@ -114,11 +115,11 @@ export default function Employees() {
 
   const calculateStats = () => {
     const total = employees.length;
-    const active = employees.filter(e => e.isActive).length;
-    const inactive = employees.filter(e => !e.isActive).length;
-    const admins = employees.filter(e => e.role === 'admin').length;
-    const managers = employees.filter(e => e.role === 'manager').length;
-    const empCount = employees.filter(e => e.role === 'employee').length;
+    const active = employees.filter((e) => e.isActive).length;
+    const inactive = employees.filter((e) => !e.isActive).length;
+    const admins = employees.filter((e) => e.role === "admin").length;
+    const managers = employees.filter((e) => e.role === "manager").length;
+    const empCount = employees.filter((e) => e.role === "employee").length;
 
     setStats({
       total,
@@ -126,7 +127,7 @@ export default function Employees() {
       inactive,
       admins,
       managers,
-      employees: empCount
+      employees: empCount,
     });
   };
 
@@ -137,10 +138,10 @@ export default function Employees() {
 
   const handleAddEmployee = async (e) => {
     e.preventDefault();
-    
+
     try {
       setProcessing({ ...processing, add: true });
-      
+
       const res = await api.post("/admin/add-employee", {
         name: formData.name,
         email: formData.email,
@@ -150,16 +151,21 @@ export default function Employees() {
         phone: formData.phone,
         designation: formData.designation,
         joiningDate: formData.joiningDate,
-        employmentType: formData.employmentType
+        employmentType: formData.employmentType,
       });
 
-      showMessage("success", `Employee added successfully! Temporary password: ${res.data.employee.tempPassword}`);
+      showMessage(
+        "success",
+        `Employee added successfully! Temporary password: ${res.data.employee.tempPassword}`,
+      );
       setShowAddModal(false);
       resetForm();
       fetchEmployees();
-
     } catch (error) {
-      showMessage("error", error.response?.data?.message || "Failed to add employee");
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to add employee",
+      );
     } finally {
       setProcessing({ ...processing, add: false });
     }
@@ -167,63 +173,91 @@ export default function Employees() {
 
   const handleUpdateEmployee = async (e) => {
     e.preventDefault();
-    
+
     try {
       setProcessing({ ...processing, [selectedEmployee._id]: true });
-      
+
       await api.put(`/admin/user/${selectedEmployee._id}`, {
         role: formData.role,
         team: formData.team,
-        phone: formData.phone,
-        designation: formData.designation,
-        employmentType: formData.employmentType
+        personalInfo: {
+          phone: formData.phone,
+        },
+        employmentDetails: {
+          designation: formData.designation,
+          employmentType: formData.employmentType,
+          joiningDate: formData.joiningDate, 
+        },
       });
 
       showMessage("success", "Employee updated successfully");
       setShowEditModal(false);
       setSelectedEmployee(null);
       fetchEmployees();
-
     } catch (error) {
-      showMessage("error", error.response?.data?.message || "Failed to update employee");
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to update employee",
+      );
     } finally {
       setProcessing({ ...processing, [selectedEmployee._id]: false });
     }
   };
 
   const handleToggleStatus = async (empId, currentStatus) => {
-    if (!window.confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this employee?`)) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to ${currentStatus ? "deactivate" : "activate"} this employee?`,
+      )
+    )
+      return;
 
     try {
       setProcessing({ ...processing, [empId]: true });
-      
+
       await api.put(`/admin/user/${empId}/status`, {
-        isActive: !currentStatus
+        isActive: !currentStatus,
       });
 
-      showMessage("success", `Employee ${currentStatus ? 'deactivated' : 'activated'} successfully`);
-      fetchEmployees();
-
+      showMessage(
+        "success",
+        `Employee ${currentStatus ? "deactivated" : "activated"} successfully`,
+      );
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp._id === empId ? { ...emp, isActive: !currentStatus } : emp,
+        ),
+      );
     } catch (error) {
-      showMessage("error", error.response?.data?.message || "Failed to update status");
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to update status",
+      );
     } finally {
       setProcessing({ ...processing, [empId]: false });
     }
   };
 
   const handleDeleteEmployee = async (empId) => {
-    if (!window.confirm("Are you sure you want to delete this employee? This action cannot be undone.")) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this employee? This action cannot be undone.",
+      )
+    )
+      return;
 
     try {
       setProcessing({ ...processing, [empId]: true });
-      
+
       await api.delete(`/admin/user/${empId}`);
 
       showMessage("success", "Employee deleted successfully");
       fetchEmployees();
-
     } catch (error) {
-      showMessage("error", error.response?.data?.message || "Failed to delete employee");
+      showMessage(
+        "error",
+        error.response?.data?.message || "Failed to delete employee",
+      );
     } finally {
       setProcessing({ ...processing, [empId]: false });
     }
@@ -231,16 +265,16 @@ export default function Employees() {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      email: '',
-      password: '',
-      role: 'employee',
-      team: '',
-      phone: '',
-      designation: '',
-      joiningDate: '',
-      employmentType: 'permanent',
-      isActive: true
+      name: "",
+      email: "",
+      password: "",
+      role: "employee",
+      team: "",
+      phone: "",
+      designation: "",
+      joiningDate: "",
+      employmentType: "permanent",
+      isActive: true,
     });
   };
 
@@ -250,45 +284,70 @@ export default function Employees() {
       name: emp.name,
       email: emp.email,
       role: emp.role,
-      team: emp.team || '',
-      phone: emp.personalInfo?.phone || '',
-      designation: emp.employmentDetails?.designation || '',
-      joiningDate: emp.employmentDetails?.joiningDate?.split('T')[0] || '',
-      employmentType: emp.employmentDetails?.employmentType || 'permanent',
-      isActive: emp.isActive
+      team: emp.team || "",
+      phone: emp.personalInfo?.phone || "",
+      designation: emp.employmentDetails?.designation || "",
+      joiningDate: emp.employmentDetails?.joiningDate?.split("T")[0] || "",
+      employmentType: emp.employmentDetails?.employmentType || "permanent",
+      isActive: emp.isActive,
     });
     setShowEditModal(true);
   };
 
   const getRoleBadge = (role) => {
-    switch(role) {
-      case 'admin':
-        return <span className="role-badge role-admin"><Shield size={12} /> Admin</span>;
-      case 'manager':
-        return <span className="role-badge role-manager"><UserCog size={12} /> Manager</span>;
-      case 'employee':
-        return <span className="role-badge role-employee"><UserCheck size={12} /> Employee</span>;
+    switch (role) {
+      case "admin":
+        return (
+          <span className="role-badge role-admin">
+            <Shield size={12} /> Admin
+          </span>
+        );
+      case "manager":
+        return (
+          <span className="role-badge role-manager">
+            <UserCog size={12} /> Manager
+          </span>
+        );
+      case "employee":
+        return (
+          <span className="role-badge role-employee">
+            <UserCheck size={12} /> Employee
+          </span>
+        );
       default:
         return <span className="role-badge">{role}</span>;
     }
   };
 
   const getStatusBadge = (isActive) => {
-    return isActive ? 
-      <span className="badge badge-success"><CheckCircle size={12} /> Active</span> :
-      <span className="badge badge-danger"><XCircle size={12} /> Inactive</span>;
+    return isActive ? (
+      <span className="badge badge-success">
+        <CheckCircle size={12} /> Active
+      </span>
+    ) : (
+      <span className="badge badge-danger">
+        <XCircle size={12} /> Inactive
+      </span>
+    );
   };
 
   const formatDate = (date) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
-  const teams = ['engineering', 'sales', 'marketing', 'hr', 'finance', 'management'];
+  const teams = [
+    "engineering",
+    "sales",
+    "marketing",
+    "hr",
+    "finance",
+    "management",
+  ];
 
   return (
     <div className="employees-container">
@@ -299,22 +358,22 @@ export default function Employees() {
           <p className="page-subtitle">Manage all employees and their roles</p>
         </div>
         <div className="header-actions">
-          <button 
+          <button
             className="btn btn-outline"
             onClick={fetchEmployees}
             disabled={loading}
           >
-            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+            <RefreshCw size={16} className={loading ? "spin" : ""} />
             Refresh
           </button>
-          <button 
+          <button
             className="btn btn-outline"
-            onClick={() => window.open('/api/admin/employees/export', '_blank')}
+            onClick={() => window.open("/api/admin/employees/export", "_blank")}
           >
             <Download size={16} />
             Export
           </button>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => {
               resetForm();
@@ -330,7 +389,11 @@ export default function Employees() {
       {/* Message */}
       {message.text && (
         <div className={`message message-${message.type}`}>
-          {message.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          {message.type === "success" ? (
+            <CheckCircle size={18} />
+          ) : (
+            <AlertCircle size={18} />
+          )}
           <span>{message.text}</span>
         </div>
       )}
@@ -338,7 +401,10 @@ export default function Employees() {
       {/* Stats Cards */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#dbeafe", color: "#2563eb" }}
+          >
             <Users size={24} />
           </div>
           <div className="stat-content">
@@ -349,18 +415,26 @@ export default function Employees() {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#dcfce7", color: "#16a34a" }}
+          >
             <UserCheck size={24} />
           </div>
           <div className="stat-content">
             <h3>Active</h3>
             <p className="stat-value">{stats.active}</p>
-            <span className="stat-label">{Math.round((stats.active / stats.total) * 100 || 0)}%</span>
+            <span className="stat-label">
+              {Math.round((stats.active / stats.total) * 100 || 0)}%
+            </span>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#fee2e2", color: "#dc2626" }}
+          >
             <UserX size={24} />
           </div>
           <div className="stat-content">
@@ -371,13 +445,18 @@ export default function Employees() {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
+          <div
+            className="stat-icon"
+            style={{ background: "#fef3c7", color: "#d97706" }}
+          >
             <UserCog size={24} />
           </div>
           <div className="stat-content">
             <h3>By Role</h3>
             <p className="stat-value">{stats.admins + stats.managers}</p>
-            <span className="stat-label">Admins: {stats.admins}, Managers: {stats.managers}</span>
+            <span className="stat-label">
+              Admins: {stats.admins}, Managers: {stats.managers}
+            </span>
           </div>
         </div>
       </div>
@@ -388,13 +467,13 @@ export default function Employees() {
           <Filter size={16} />
           <h3>Filters</h3>
         </div>
-        
+
         <div className="filters-grid">
           <div className="filter-group">
             <label>Role</label>
-            <select 
+            <select
               value={filters.role}
-              onChange={(e) => setFilters({...filters, role: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, role: e.target.value })}
               className="filter-select"
             >
               <option value="all">All Roles</option>
@@ -406,9 +485,11 @@ export default function Employees() {
 
           <div className="filter-group">
             <label>Status</label>
-            <select 
+            <select
               value={filters.status}
-              onChange={(e) => setFilters({...filters, status: e.target.value})}
+              onChange={(e) =>
+                setFilters({ ...filters, status: e.target.value })
+              }
               className="filter-select"
             >
               <option value="all">All Status</option>
@@ -419,14 +500,16 @@ export default function Employees() {
 
           <div className="filter-group">
             <label>Team</label>
-            <select 
+            <select
               value={filters.team}
-              onChange={(e) => setFilters({...filters, team: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, team: e.target.value })}
               className="filter-select"
             >
               <option value="all">All Teams</option>
-              {teams.map(team => (
-                <option key={team} value={team}>{team}</option>
+              {teams.map((team) => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
               ))}
             </select>
           </div>
@@ -439,7 +522,9 @@ export default function Employees() {
                 type="text"
                 placeholder="Search by name, email, ID..."
                 value={filters.search}
-                onChange={(e) => setFilters({...filters, search: e.target.value})}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value })
+                }
               />
             </div>
           </div>
@@ -482,28 +567,42 @@ export default function Employees() {
                         </div>
                         <div>
                           <div className="employee-name">{emp.name}</div>
-                          <div className="employee-id">ID: {emp.employeeId || 'N/A'}</div>
+                          <div className="employee-id">
+                            ID: {emp.employeeId || "N/A"}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td>
                       <div className="contact-info">
-                        <div><Mail size={12} /> {emp.email}</div>
+                        <div>
+                          <Mail size={12} /> {emp.email}
+                        </div>
                         {emp.personalInfo?.phone && (
-                          <div><Phone size={12} /> {emp.personalInfo.phone}</div>
+                          <div>
+                            <Phone size={12} /> {emp.personalInfo.phone}
+                          </div>
                         )}
                       </div>
                     </td>
                     <td>
                       <div className="role-team">
                         {getRoleBadge(emp.role)}
-                        {emp.team && <span className="team-badge">{emp.team}</span>}
+                        {emp.team && (
+                          <span className="team-badge">{emp.team}</span>
+                        )}
                       </div>
                     </td>
                     <td>
                       <div className="employment-info">
-                        <div><Briefcase size={12} /> {emp.employmentDetails?.designation || 'Not set'}</div>
-                        <div><Calendar size={12} /> Joined: {formatDate(emp.employmentDetails?.joiningDate)}</div>
+                        <div>
+                          <Briefcase size={12} />{" "}
+                          {emp.employmentDetails?.designation || "Not set"}
+                        </div>
+                        <div>
+                          <Calendar size={12} /> Joined:{" "}
+                          {formatDate(emp.employmentDetails?.joiningDate)}
+                        </div>
                       </div>
                     </td>
                     <td>{getStatusBadge(emp.isActive)}</td>
@@ -517,12 +616,18 @@ export default function Employees() {
                           <Edit size={16} />
                         </button>
                         <button
-                          className={`btn-icon ${emp.isActive ? 'btn-icon-warning' : 'btn-icon-success'}`}
-                          onClick={() => handleToggleStatus(emp._id, emp.isActive)}
+                          className={`btn-icon ${emp.isActive ? "btn-icon-warning" : "btn-icon-success"}`}
+                          onClick={() =>
+                            handleToggleStatus(emp._id, emp.isActive)
+                          }
                           disabled={processing[emp._id]}
-                          title={emp.isActive ? 'Deactivate' : 'Activate'}
+                          title={emp.isActive ? "Deactivate" : "Activate"}
                         >
-                          {emp.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                          {emp.isActive ? (
+                            <UserX size={16} />
+                          ) : (
+                            <UserCheck size={16} />
+                          )}
                         </button>
                         <button
                           className="btn-icon btn-icon-danger"
@@ -545,10 +650,13 @@ export default function Employees() {
       {/* Add Employee Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Add New Employee</h2>
-              <button 
+              <button
                 className="close-btn"
                 onClick={() => {
                   setShowAddModal(false);
@@ -566,7 +674,9 @@ export default function Employees() {
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="form-control"
                     required
                   />
@@ -577,7 +687,9 @@ export default function Employees() {
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     className="form-control"
                     required
                   />
@@ -588,7 +700,9 @@ export default function Employees() {
                   <input
                     type="password"
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
                     className="form-control"
                     placeholder="Leave empty for default"
                   />
@@ -598,7 +712,9 @@ export default function Employees() {
                   <label>Role</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, role: e.target.value })
+                    }
                     className="form-control"
                   >
                     <option value="employee">Employee</option>
@@ -611,12 +727,16 @@ export default function Employees() {
                   <label>Team</label>
                   <select
                     value={formData.team}
-                    onChange={(e) => setFormData({...formData, team: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, team: e.target.value })
+                    }
                     className="form-control"
                   >
                     <option value="">Select Team</option>
-                    {teams.map(team => (
-                      <option key={team} value={team}>{team}</option>
+                    {teams.map((team) => (
+                      <option key={team} value={team}>
+                        {team}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -626,7 +746,9 @@ export default function Employees() {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
                     className="form-control"
                   />
                 </div>
@@ -636,7 +758,9 @@ export default function Employees() {
                   <input
                     type="text"
                     value={formData.designation}
-                    onChange={(e) => setFormData({...formData, designation: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, designation: e.target.value })
+                    }
                     className="form-control"
                   />
                 </div>
@@ -646,7 +770,9 @@ export default function Employees() {
                   <input
                     type="date"
                     value={formData.joiningDate}
-                    onChange={(e) => setFormData({...formData, joiningDate: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, joiningDate: e.target.value })
+                    }
                     className="form-control"
                   />
                 </div>
@@ -655,7 +781,12 @@ export default function Employees() {
                   <label>Employment Type</label>
                   <select
                     value={formData.employmentType}
-                    onChange={(e) => setFormData({...formData, employmentType: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        employmentType: e.target.value,
+                      })
+                    }
                     className="form-control"
                   >
                     <option value="permanent">Permanent</option>
@@ -682,7 +813,7 @@ export default function Employees() {
                   className="btn btn-primary"
                   disabled={processing.add}
                 >
-                  {processing.add ? 'Adding...' : 'Add Employee'}
+                  {processing.add ? "Adding..." : "Add Employee"}
                 </button>
               </div>
             </form>
@@ -693,10 +824,13 @@ export default function Employees() {
       {/* Edit Employee Modal */}
       {showEditModal && selectedEmployee && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Edit Employee</h2>
-              <button 
+              <button
                 className="close-btn"
                 onClick={() => {
                   setShowEditModal(false);
@@ -734,7 +868,9 @@ export default function Employees() {
                   <label>Role</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, role: e.target.value })
+                    }
                     className="form-control"
                   >
                     <option value="employee">Employee</option>
@@ -747,12 +883,16 @@ export default function Employees() {
                   <label>Team</label>
                   <select
                     value={formData.team}
-                    onChange={(e) => setFormData({...formData, team: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, team: e.target.value })
+                    }
                     className="form-control"
                   >
                     <option value="">Select Team</option>
-                    {teams.map(team => (
-                      <option key={team} value={team}>{team}</option>
+                    {teams.map((team) => (
+                      <option key={team} value={team}>
+                        {team}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -762,7 +902,9 @@ export default function Employees() {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
                     className="form-control"
                   />
                 </div>
@@ -772,7 +914,9 @@ export default function Employees() {
                   <input
                     type="text"
                     value={formData.designation}
-                    onChange={(e) => setFormData({...formData, designation: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, designation: e.target.value })
+                    }
                     className="form-control"
                   />
                 </div>
@@ -782,7 +926,9 @@ export default function Employees() {
                   <input
                     type="date"
                     value={formData.joiningDate}
-                    onChange={(e) => setFormData({...formData, joiningDate: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, joiningDate: e.target.value })
+                    }
                     className="form-control"
                   />
                 </div>
@@ -791,7 +937,12 @@ export default function Employees() {
                   <label>Employment Type</label>
                   <select
                     value={formData.employmentType}
-                    onChange={(e) => setFormData({...formData, employmentType: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        employmentType: e.target.value,
+                      })
+                    }
                     className="form-control"
                   >
                     <option value="permanent">Permanent</option>
@@ -819,7 +970,9 @@ export default function Employees() {
                   className="btn btn-primary"
                   disabled={processing[selectedEmployee._id]}
                 >
-                  {processing[selectedEmployee._id] ? 'Updating...' : 'Update Employee'}
+                  {processing[selectedEmployee._id]
+                    ? "Updating..."
+                    : "Update Employee"}
                 </button>
               </div>
             </form>

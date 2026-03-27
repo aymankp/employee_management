@@ -20,9 +20,12 @@ api.interceptors.response.use(
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+
     if (token) {
+      config.headers = config.headers || {}; // 🔥 THIS LINE FIXES EVERYTHING
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -34,22 +37,6 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    
-    // ✅ ONLY clear token if it's REALLY unauthorized
-    // if (error.response?.status === 401) {
-    //   const token = localStorage.getItem('token');
-    //   console.log('🔒 401 Unauthorized - Token:', token ? 'Present' : 'Missing');
-      
-    //   // Only clear if token exists (prevents infinite loop)
-    //   if (token) {
-    //     console.log('🔒 Clearing invalid token');
-    //     localStorage.removeItem('token');
-        
-    //     // ✅ Don't redirect immediately - let the app handle it
-    //     // window.location.href = '/login';  // ❌ REMOVE THIS
-    //   }
-    // }
-    
     return Promise.reject(error);
   }
 );

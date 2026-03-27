@@ -24,8 +24,14 @@ export const AuthProvider = ({ children }) => {
     if (!userData) return null;
 
     const processedUser = { ...userData };
+    processedUser.lastSeen = userData.lastSeen || null;
+    processedUser.lastLogin = userData.lastLogin || null;
 
-    //  FIX: normalize id
+    processedUser.reportingTo =
+  userData.reportingTo ||
+  userData?.employmentDetails?.reportingTo ||
+  null;
+    // id fix
     processedUser._id = userData._id || userData.id;
 
     // role fix
@@ -40,6 +46,9 @@ export const AuthProvider = ({ children }) => {
       processedUser.avatar = getFullAvatarUrl(processedUser.avatar);
     }
 
+    // 🔥 THIS LINE FIXES YOUR ENTIRE PROBLEM
+    processedUser.lastSeen = userData.lastSeen || null;
+    processedUser.lastLogin = userData.lastLogin || null;
     return processedUser;
   };
 
@@ -91,40 +100,36 @@ export const AuthProvider = ({ children }) => {
 
   // Login
   const login = async (email, password) => {
-  try {
-    const response = await loginApi(email, password);
+    try {
+      const response = await loginApi(email, password);
+      const token = response.data.token;
 
-    console.log("LOGIN API RAW:", response.data);
+      if (!token) {
+        throw new Error("Invalid response from server");
+      }
 
-    const token = response.data.token;
+      localStorage.setItem("token", token);
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-    // 🔥 flexible user extraction
-    const userData =
-      response.data.user ||
-      response.data.data ||
-      response.data.profile ||
-      response.data;
+      // 🔥 IMPORTANT: fetch full profile after login
+      const profileRes = await getProfile();
 
-    if (!token || !userData) {
-      throw new Error("Invalid response from server");
+      const userData =
+        profileRes.data.user || profileRes.data.profile || profileRes.data;
+
+      const processedUser = processUserData(userData);
+      setUser(processedUser);
+
+      return { success: true, role: processedUser.role };
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || "Login failed",
+      };
     }
-
-    localStorage.setItem("token", token);
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-    const processedUser = processUserData(userData);
-    setUser(processedUser);
-
-    return { success: true, role: processedUser.role };
-  } catch (error) {
-    console.error("LOGIN ERROR:", error);
-
-    return {
-      success: false,
-      error: error.response?.data?.message || error.message || "Login failed",
-    };
-  }
-};
+  };
   // Logout
   const logout = () => {
     localStorage.removeItem("token");

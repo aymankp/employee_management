@@ -134,7 +134,9 @@ function AppRoutes() {
         <Route path="all-leaves" element={<LeaveHistory />} />
         <Route path="all-documents" element={<Documents />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="/admin/employees/:id" element={<EmployeeDetails />} />
+        <Route path="employees/:id" element={<EmployeeDetails />} />
+        <Route path="profile" element={<Profile />} />
+
       </Route>
 
       {/* FALLBACK */}

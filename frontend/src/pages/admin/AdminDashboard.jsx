@@ -40,70 +40,71 @@ export default function AdminDashboard() {
 
   // ========== FETCH DASHBOARD DATA ==========
   const fetchDashboardData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Fetch real data from your APIs
-      const [usersRes, leavesRes, attendanceRes, docsRes, deptsRes, perfRes] =
-        await Promise.all([
-          api.get("/admin/users").catch(() => ({ data: [] })),
-          api.get("/admin/leaves").catch(() => ({ data: [] })),
-          api
-            .get("/attendance/today-summary")
-            .catch(() => ({ data: { present: 0, absent: 0 } })),
-          api.get("/documents/pending").catch(() => ({ data: { pending: 0 } })),
-          api.get("/departments").catch(() => ({ data: { departments: [] } })),
-          api
-            .get("/performance/status/pending")
-            .catch(() => ({ data: { pending: 0 } })),
-        ]);
+  setLoading(true);
+  setError(null);
 
-      const employees = usersRes.data || [];
-      const leaves = leavesRes.data || [];
-      const attendance = attendanceRes.data?.data || { present: 0, absent: 0 };
-      const documents = docsRes.data || { pending: 0 };
-      const departments = deptsRes.data?.departments || [];
-      const performance = perfRes.data || { pending: 0 };
+  try {
+    const [usersRes, leavesRes, attendanceRes, docsRes, deptsRes, perfRes] =
+      await Promise.all([
+        api.get("/admin/users"),
+        api.get("/admin/leaves"),
+        api.get("/attendance/today-summary"),
+        api.get("/documents/pending"),
+        api.get("/departments"),
+        api.get("/performance/status/pending"),
+      ]);
 
-      setUsers(employees);
+    const employees = usersRes.data || [];
+    const leaves = leavesRes.data || [];
+    const attendance = attendanceRes.data || { present: 0, absent: 0 };
+    const documents = docsRes.data || { pending: 0 };
 
-      setData({
-        employees: {
-          total: employees.length,
-          active: employees.filter((e) => e.isActive !== false).length,
-          admins: employees.filter((e) => e.role === "admin").length,
-          managers: employees.filter((e) => e.role === "manager").length,
-          employees: employees.filter((e) => e.role === "employee").length,
-        },
-        leaves: {
-          total: leaves.length,
-          pending: leaves.filter((l) => l.status === "pending").length,
-          approved: leaves.filter((l) => l.status === "approved").length,
-          rejected: leaves.filter((l) => l.status === "rejected").length,
-        },
-        attendance: {
-          present: attendance.present || 0,
-          absent: attendance.absent || 0,
-          total: (attendance.present || 0) + (attendance.absent || 0),
-        },
-        documents: {
-          pending: documents.pending || 0,
-        },
-        departments: {
-          total: departments.length,
-          active: departments.filter((d) => d.status === "active").length,
-        },
-        performance: {
-          pending: performance.pending || 0,
-        },
-      });
-    } catch (err) {
-      console.error("Error fetching dashboard data:", err);
-      setError("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const departments = Array.isArray(deptsRes.data)
+      ? deptsRes.data
+      : deptsRes.data?.departments || [];
+
+    const performance = perfRes.data || { pending: 0 };
+
+    setUsers(employees);
+
+    setData({
+      employees: {
+        total: employees.length,
+        active: employees.filter((e) => e.isActive !== false).length,
+        admins: employees.filter((e) => e.role === "admin").length,
+        managers: employees.filter((e) => e.role === "manager").length,
+        employees: employees.filter((e) => e.role === "employee").length,
+      },
+      leaves: {
+        total: leaves.length,
+        pending: leaves.filter((l) => l.status === "pending").length,
+        approved: leaves.filter((l) => l.status === "approved").length,
+        rejected: leaves.filter((l) => l.status === "rejected").length,
+      },
+      attendance: {
+        present: attendance.present || 0,
+        absent: attendance.absent || 0,
+        total: (attendance.present || 0) + (attendance.absent || 0),
+      },
+      documents: {
+        pending: documents.pending || 0,
+      },
+      departments: {
+        total: departments.length,
+        active: departments.filter((d) => d.status === "active").length,
+      },
+      performance: {
+        pending: performance.pending || 0,
+      },
+    });
+
+  } catch (err) {
+    console.error("REAL ERROR:", err.response?.data || err.message);
+    setError("Failed to load dashboard data");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchDashboardData();
