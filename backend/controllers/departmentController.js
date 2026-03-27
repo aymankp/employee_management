@@ -1,5 +1,6 @@
 const Department = require('../models/Department');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 // @desc    Create new department
 // @route   POST /api/departments
@@ -8,7 +9,26 @@ const createDepartment = async (req, res) => {
   try {
     const { name, code, description, head, parentDepartment, location, budget } = req.body;
 
-    // Check if department with same name or code exists
+    // ✅ Validate parentDepartment
+    if (
+      parentDepartment &&
+      parentDepartment !== "" &&
+      !mongoose.Types.ObjectId.isValid(parentDepartment)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid parent department ID"
+      });
+    }
+
+    // ✅ Validate head
+    if (head && !mongoose.Types.ObjectId.isValid(head)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid head ID"
+      });
+    }
+
     const existingDept = await Department.findOne({
       $or: [
         { name: { $regex: new RegExp(`^${name}$`, 'i') } },
@@ -23,20 +43,33 @@ const createDepartment = async (req, res) => {
       });
     }
 
-    // Create department
+    const parentDeptValue =
+      parentDepartment && parentDepartment !== ""
+        ? parentDepartment
+        : null;
+
     const department = await Department.create({
       name,
       code: code.toUpperCase(),
       description,
       head,
-      parentDepartment,
+      parentDepartment: parentDeptValue,
       location,
       budget,
       createdBy: req.user._id
     });
 
-    // If head is assigned, update that user's department
+    // ✅ Safe head assignment
     if (head) {
+      const headUser = await User.findById(head);
+
+      if (!headUser || !['admin', 'manager'].includes(headUser.role)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid department head"
+        });
+      }
+
       await User.findByIdAndUpdate(head, {
         'employmentDetails.department': department._id
       });
@@ -47,6 +80,7 @@ const createDepartment = async (req, res) => {
       message: 'Department created successfully',
       department
     });
+
   } catch (error) {
     console.error('Create department error:', error);
     res.status(500).json({
@@ -58,14 +92,15 @@ const createDepartment = async (req, res) => {
 
 // @desc    Get all departments
 // @route   GET /api/departments
-// @access  Admin/Manager
+// @access  Admin
 const getAllDepartments = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, status } = req.query;
 
-    // Build filter
     const filter = {};
+
     if (status) filter.status = status;
+
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -73,19 +108,18 @@ const getAllDepartments = async (req, res) => {
       ];
     }
 
-    // Get departments with pagination
+    // 🔥 IMPORTANT: Role-based restriction
+    if (req.user.role === 'manager') {
+      filter.head = req.user._id;
+    }
+
     const departments = await Department.find(filter)
       .populate('head', 'name email employeeId')
       .populate('parentDepartment', 'name code')
       .populate('createdBy', 'name email')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .skip((page - 1) * Number(limit))
       .sort({ name: 1 });
-
-    // Update employee count for each department
-    for (let dept of departments) {
-      await dept.updateEmployeeCount();
-    }
 
     const total = await Department.countDocuments(filter);
 
@@ -96,12 +130,9 @@ const getAllDepartments = async (req, res) => {
       currentPage: page,
       total
     });
+
   } catch (error) {
-    console.error('Get departments error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -110,6 +141,7 @@ const getAllDepartments = async (req, res) => {
 // @access  Admin/Manager
 const getDepartmentById = async (req, res) => {
   try {
+
     const department = await Department.findById(req.params.id)
       .populate('head', 'name email employeeId phone')
       .populate('parentDepartment', 'name code head')
@@ -123,10 +155,23 @@ const getDepartmentById = async (req, res) => {
       });
     }
 
-    // Update employee count
-    await department.updateEmployeeCount();
+    // 🔥 Correct role check
+    if (req.user.role === 'manager') {
+      if (!department.head || department.head._id.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+    }
 
-    // Get employees in this department
+    // 🔥 Optimized count
+    const employeeCount = await User.countDocuments({
+      'employmentDetails.department': department._id,
+      isActive: true
+    });
+
+    // 🔥 Fetch employees
     const employees = await User.find({
       'employmentDetails.department': department._id,
       isActive: true
@@ -138,8 +183,9 @@ const getDepartmentById = async (req, res) => {
       success: true,
       department,
       employees,
-      employeeCount: employees.length
+      employeeCount
     });
+
   } catch (error) {
     console.error('Get department error:', error);
     res.status(500).json({
@@ -155,8 +201,20 @@ const getDepartmentById = async (req, res) => {
 const updateDepartment = async (req, res) => {
   try {
     const { name, code, description, head, parentDepartment, location, budget, status } = req.body;
+    
+    if (
+      parentDepartment &&
+      parentDepartment !== "" &&
+      !mongoose.Types.ObjectId.isValid(parentDepartment)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid parent department ID"
+      });
+    }
 
     const department = await Department.findById(req.params.id);
+
     if (!department) {
       return res.status(404).json({
         success: false,
@@ -164,6 +222,12 @@ const updateDepartment = async (req, res) => {
       });
     }
 
+    // AFTER fetching
+    if (req.user.role === 'manager') {
+      if (!department.head || !department.head.equals(req.user._id)) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
+    }
     // Check name uniqueness if changed
     if (name && name.toLowerCase() !== department.name.toLowerCase()) {
       const nameExists = await Department.findOne({
@@ -193,7 +257,7 @@ const updateDepartment = async (req, res) => {
     }
 
     // If head is changing, update old and new head's department
-    if (head && head.toString() !== department.head?.toString()) {
+   if (head && (!department.head || head !== department.head.toString())) {
       // Remove old head's department
       if (department.head) {
         await User.findByIdAndUpdate(department.head, {
@@ -211,7 +275,10 @@ const updateDepartment = async (req, res) => {
     department.code = code ? code.toUpperCase() : department.code;
     department.description = description || department.description;
     department.head = head || department.head;
-    department.parentDepartment = parentDepartment || department.parentDepartment;
+    department.parentDepartment =
+      parentDepartment && parentDepartment !== ""
+        ? parentDepartment
+        : null;
     department.location = location || department.location;
     department.budget = budget !== undefined ? budget : department.budget;
     department.status = status || department.status;
@@ -322,8 +389,8 @@ const getDepartmentStats = async (req, res) => {
         summary: {
           totalDepartments,
           totalEmployees,
-          avgEmployeesPerDept: totalDepartments > 0 
-            ? Math.round(totalEmployees / totalDepartments) 
+          avgEmployeesPerDept: totalDepartments > 0
+            ? Math.round(totalEmployees / totalDepartments)
             : 0
         }
       }

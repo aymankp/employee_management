@@ -47,7 +47,7 @@ const router = express.Router();
 router.use(protect);
 
 // Profile routes - only accessible by managers and admins
-router.get('/me', authorize('manager', 'admin'), getManagerProfile);
+router.get('/me', protect, authorize('manager', 'admin'), getManagerProfile);
 router.put('/me', authorize('manager', 'admin'), updateManagerProfile);
 router.put('/me/avatar', authorize('manager', 'admin'), upload.single('avatar'), uploadManagerAvatar);
 

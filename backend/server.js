@@ -5,10 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-
 const connectDB = require("./config/db");
-const mongoose = require("mongoose");
-
 const authRoutes = require("./routes/authRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -22,8 +19,10 @@ const documentRoutes = require("./routes/documentRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 
+
 const { onlineUsers } = require("./socketStore");
 const User = require("./models/User");
+
 
 connectDB();
 
@@ -44,11 +43,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leave", leaveRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/status", statusRoutes);
-app.use("/api/departments", departmentRoutes);
-app.use("/api/employees", employeeRoutes);
-app.use("/api/attendance", attendanceRoutes);
+
 app.use("/api/performance", performanceRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/departments", departmentRoutes);
+
+app.use("/api/employees", employeeRoutes);
+app.use("/api/attendance", attendanceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reports", reportRoutes);
 app.use('/api/managers', managerRoutes);
@@ -77,8 +78,6 @@ const io = new Server(server, {
 const userSockets = new Map(); // userId -> Set of socket ids
 
 io.on("connection", (socket) => {
-  console.log(`🔌 New client connected: ${socket.id}`);
-
   socket.on("user-online", async (userId) => {
     try {
       userId = String(userId);

@@ -1,11 +1,9 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, team } = req.body;
-
+    const { name, email, password, team, reportingTo } = req.body;
     // 1. Validation 
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields required" });
@@ -23,7 +21,10 @@ const registerUser = async (req, res) => {
       email: email.toLowerCase(),
       password,
       role: "employee",
-      team: team || null
+      team: team || null,
+      employmentDetails: {
+        reportingTo: reportingTo || null
+      }
     });
 
     // 5. Success response
@@ -48,28 +49,52 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    // 1. validation 
+
+    // 1. validation
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
-    // 2. user find
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    //  3. check user exists
+
+    // 2. find user
+    // const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    // password check
-    const isMatch = await user.comparePassword(password);
 
+    // 3. password check
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    // 🔥 Login tracking
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+    const userAgent = req.headers["user-agent"];
+
+    const loginRecord = {
+      loginAt: new Date(),
+      ip,
+      device: userAgent,
+      location: "Unknown",
+    };
+
+    user.lastLogin = new Date();
+
+    user.loginHistory = user.loginHistory || [];
+    user.loginHistory.unshift(loginRecord);
+    user.loginHistory = user.loginHistory.slice(0, 5);
+
+    await user.save();
+
+    // 4. token
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
+    // 5. response
     res.status(200).json({
       token,
       user: {
@@ -77,10 +102,12 @@ const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        lastLogin: user.lastLogin,
       },
     });
 
   } catch (err) {
+    console.error(err); // 🔥 add this for debugging
     res.status(500).json({ message: "Server error" });
   }
 };

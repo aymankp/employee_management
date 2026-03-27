@@ -12,8 +12,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/.+\@.+\..+/, "Please enter a valid email"],
     },
-    password: { type: String, required: true },
-
+    password: {
+      type: String,
+      required: true,
+      minlength: 6,
+      select: false
+    },
     // Role & Team
     role: {
       type: String,
@@ -22,20 +26,27 @@ const userSchema = new mongoose.Schema(
     },
     team: {
       type: String,
-      required: function () {
-        return this.role !== "admin";
-      },
-      default: "general"
+      default: "general",
     },
     avatar: {
       type: String,
       default: ""
     },
-
     // Status
-    lastSeen: { type: Date, default: Date.now },
     isActive: { type: Boolean, default: true },
+    // Status
+    // Status
+    lastLogin: { type: Date },     // NEW
+    lastSeen: { type: Date },      //  REMOVE default (important)
 
+    loginHistory: [
+      {
+        loginAt: { type: Date },
+        ip: String,
+        device: String,
+        location: String
+      }
+    ],
     // Leave Balance
     leaveBalance: {
       casual: { total: { type: Number, default: 10 }, used: { type: Number, default: 0 } },
@@ -49,16 +60,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
-      default: function () {
-        const year = new Date().getFullYear();
-        const random = Math.floor(1000 + Math.random() * 9000);
-        return `EMP${year}${random}`;
-      }
     },
 
     // Personal Information
     personalInfo: {
-      phone: { type: String, match: /^[0-9]{10}$/ },
+      phone: { type: String, match: /^[0-9]{10}$|^\+91[0-9]{10}$/ },
       alternatePhone: String,
       dateOfBirth: Date,
       gender: { type: String, enum: ['male', 'female', 'other'] },
@@ -188,20 +194,23 @@ userSchema.virtual('leaveSummary').get(function () {
   return summary;
 });
 
-
-// Hash password before saving
 userSchema.pre("save", async function (next) {
+  // Employee ID
+  if (!this.employeeId) {
+    this.employeeId = `EMP${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
 
-  if (!this.isModified("password")) return next();
-
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  // Password hash
+  if (this.isModified("password")) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 
   next();
 });
-
 // Method to compare password
 userSchema.methods.comparePassword = async function (password) {
+  if (!this.password) throw new Error("Password not selected");
   return bcrypt.compare(password, this.password);
 };
 

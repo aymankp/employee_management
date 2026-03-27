@@ -1,52 +1,40 @@
 const mongoose = require('mongoose');
-
 const departmentSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
-    required: true, 
-    unique: true,
-    trim: true 
-  },
-  
-  code: { 
-    type: String, 
-    required: true, 
-    unique: true,
-    uppercase: true
-  },
-  
+  name: { type: String, required: true, unique: true, trim: true },
+  code: { type: String, required: true, unique: true, uppercase: true },
   description: String,
-  
-  head: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
-  },
-  
+
+  head: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
   parentDepartment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department'
   },
-  
+
+
+  teams: [
+    {
+      name: { type: String, required: true },
+      lead: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+      createdAt: { type: Date, default: Date.now }
+    }
+  ],
+
   location: String,
-  
-  budget: {
-    type: Number,
-    default: 0
-  },
-  
-  employeeCount: {
-    type: Number,
-    default: 0
-  },
-  
+  budget: { type: Number, default: 0 },
+
+  employeeCount: { type: Number, default: 0 },
+
   status: {
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
   },
-  
+
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+
 }, { timestamps: true });
 
 // Update employee count

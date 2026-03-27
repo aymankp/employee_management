@@ -1,6 +1,4 @@
 const User = require('../models/User');
-const Department = require('../models/Department');
-
 // @desc    Get logged in user's profile
 // @route   GET /api/employees/me
 // @access  Private
@@ -8,7 +6,7 @@ const getMyProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .populate('employmentDetails.department', 'name code head')
-      .populate('employmentDetails.reportingTo', 'name email')
+      .populate('employmentDetails.reportingTo', '_id name email')
       .select('-password');
 
     res.json({
@@ -98,7 +96,7 @@ const getEmployeeDirectory = async (req, res) => {
     // Execute query
     const employees = await User.find(filter)
       .populate('employmentDetails.department', 'name code')
-      .populate('employmentDetails.reportingTo', 'name email')
+      .populate('employmentDetails.reportingTo', '_id name email')
       .select('name email employeeId role employmentDetails team isActive')
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -138,7 +136,7 @@ const getEmployeeById = async (req, res) => {
     const employee = await User.findById(id)
       .select('-password')
       .populate('employmentDetails.department', 'name code')
-      .populate('employmentDetails.reportingTo', 'name email');
+      .populate('employmentDetails.reportingTo', '_id name email');
 
     if (!employee) {
       return res.status(404).json({ 
@@ -236,7 +234,7 @@ const updateEmployee = async (req, res) => {
     const updatedEmployee = await User.findById(employee._id)
       .select('-password')
       .populate('employmentDetails.department', 'name code')
-      .populate('employmentDetails.reportingTo', 'name email');
+      .populate('employmentDetails.reportingTo', '_id name email');
 
     res.json({
       success: true,

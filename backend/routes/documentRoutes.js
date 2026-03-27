@@ -5,6 +5,7 @@ const path = require('path');
 const { protect } = require('../middleware/authMiddleware');
 const { isAdmin, isManager } = require('../middleware/roleMiddleware');
 const documentController = require('../controllers/documentController');
+const Document = require("../models/Document");
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -101,5 +102,15 @@ router.put('/:id/verify',
   isAdmin, 
   documentController.verifyDocument
 );
+// documentRoutes.js
+
+router.get("/pending", async (req, res) => {
+  try {
+    const count = await Document.countDocuments({ verificationStatus: "pending" })
+    res.json({ pending: count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;

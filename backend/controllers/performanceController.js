@@ -386,15 +386,16 @@ const getReviewsByStatus = async (req, res) => {
   try {
     const { status } = req.params;
 
-    const reviews = await PerformanceReview.find({ status });
+    const count = await PerformanceReview.countDocuments({ status });
 
     res.json({
       success: true,
-      reviews
+      count,
+      pending: count
     });
+
   } catch (error) {
     res.status(500).json({
-      success: false,
       message: error.message
     });
   }

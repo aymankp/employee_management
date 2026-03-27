@@ -1,7 +1,7 @@
 
 const express = require("express");
 const router = express.Router();
-
+const User = require("../models/User");
 const { protect } = require("../middleware/authMiddleware");
 const { isAdmin } = require("../middleware/roleMiddleware");
 const { getUserById } = require("../controllers/employeeController");
@@ -10,7 +10,10 @@ const {
   getAllUsers,
   updateUserRole,
   getAllLeaves,
-  assignManager
+  assignManager,
+  updateUserStatus,
+  updateUser,
+  deleteUser
 } = require("../controllers/adminController");
 
 // 🔥 THIS ROUTE
@@ -20,7 +23,7 @@ router.post("/add-employee", protect, isAdmin, addEmployee);
 router.get("/users", protect, isAdmin, getAllUsers);
 router.get("/user/:id", protect, isAdmin, getUserById);
 router.put("/user/:id/role", protect, isAdmin, updateUserRole);
-router.get("/user/:id", protect, isAdmin, getUserById);
+
 // routes/adminRoutes.js
 router.put("/assign-manager", protect, isAdmin, assignManager);
 
@@ -30,5 +33,11 @@ router.get("/test", (req, res) => {
   res.send("ADMIN ROUTE OK");
 });
 
+router.put("/user/:id/status", protect, isAdmin, updateUserStatus);
+router.put("/user/:id", protect, isAdmin, updateUser);
+
+
+
+router.delete("/user/:id", protect, isAdmin, deleteUser);
 
 module.exports = router;
