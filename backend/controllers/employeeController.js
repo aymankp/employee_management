@@ -24,7 +24,7 @@ const getMyProfile = async (req, res) => {
 const updateMyProfile = async (req, res) => {
   try {
     const updates = req.body;
-    
+
     // Fields that cannot be updated by employee
     delete updates.role;
     delete updates.employeeId;
@@ -54,19 +54,19 @@ const updateMyProfile = async (req, res) => {
 // @access  Manager/Admin
 const getEmployeeDirectory = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      search, 
-      department, 
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      department,
       role,
       sortBy = 'name',
-      order = 'asc' 
+      order = 'asc'
     } = req.query;
 
     // Build filter
     const filter = { isActive: true };
-    
+
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -74,11 +74,11 @@ const getEmployeeDirectory = async (req, res) => {
         { employeeId: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     if (department) {
       filter['employmentDetails.department'] = department;
     }
-    
+
     if (role) {
       filter.role = role;
     }
@@ -124,12 +124,12 @@ const getEmployeeDirectory = async (req, res) => {
 const getEmployeeById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Check if id is a valid ObjectId format
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid employee ID format" 
+        message: "Invalid employee ID format"
       });
     }
 
@@ -139,28 +139,30 @@ const getEmployeeById = async (req, res) => {
       .populate('employmentDetails.reportingTo', '_id name email');
 
     if (!employee) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Employee not found" 
+        message: "Employee not found"
       });
     }
 
-    res.json({ 
+    res.json({
       success: true,
-      employee 
+      employee
     });
   } catch (error) {
     console.error("Get employee error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Server error" 
+      message: "Server error"
     });
   }
 };
 
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id)
+      .select("-password")
+      .populate("employmentDetails.reportingTo", "_id name email");
 
     if (!user) {
       return res.status(404).json({
@@ -253,7 +255,7 @@ const updateEmployee = async (req, res) => {
 const getEmployeeStats = async (req, res) => {
   try {
     const filter = {};
-    
+
     if (req.user.role === 'manager') {
       filter.team = req.user.team;
     }

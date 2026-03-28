@@ -5,7 +5,9 @@ const bcrypt = require("bcryptjs");
 // 1️⃣ Get all users
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
+    const users = await User.find()
+      .select("-password")
+      .populate("employmentDetails.reportingTo", "name email");
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -172,11 +174,57 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // basic fields
-    if (req.body.role) user.role = req.body.role;
-    if (req.body.team) user.team = req.body.team;
+    // ✅ ROLE UPDATE FIRST
+    if (req.body.role) {
+      user.role = req.body.role;
+    }
 
-    // nested fields (IMPORTANT)
+    // ✅ TEAM
+    if (req.body.team) {
+      user.team = req.body.team;
+    }
+
+    // 🔥 MANAGER VALIDATION (MAIN FIX)
+    if (req.body.employmentDetails?.reportingTo !== undefined) {
+      const managerId = req.body.employmentDetails.reportingTo;
+
+      // ❌ Only employees can have manager
+      if (user.role !== "employee") {
+        return res.status(400).json({
+          message: "Only employees can have a manager",
+        });
+      }
+
+      // ❌ Prevent self-assignment
+      if (managerId === user._id.toString()) {
+        return res.status(400).json({
+          message: "User cannot be their own manager",
+        });
+      }
+
+      // ❌ If null → remove manager
+      if (!managerId) {
+        user.employmentDetails.reportingTo = null;
+      } else {
+        // ✅ Check manager exists & role is manager
+        const manager = await User.findById(managerId);
+
+        if (!manager || manager.role !== "manager") {
+          return res.status(400).json({
+            message: "Invalid manager selected",
+          });
+        }
+
+        user.employmentDetails.reportingTo = managerId;
+      }
+    }
+
+    //  AUTO REMOVE MANAGER IF ROLE CHANGES
+    if (req.body.role && req.body.role !== "employee") {
+      user.employmentDetails.reportingTo = null;
+    }
+
+    // OTHER FIELDS
     if (req.body.personalInfo?.phone !== undefined) {
       user.personalInfo.phone = req.body.personalInfo.phone;
     }
@@ -190,12 +238,14 @@ const updateUser = async (req, res) => {
       user.employmentDetails.employmentType =
         req.body.employmentDetails.employmentType;
     }
+
     if (req.body.employmentDetails?.joiningDate !== undefined) {
       user.employmentDetails.joiningDate =
         req.body.employmentDetails.joiningDate
           ? new Date(req.body.employmentDetails.joiningDate)
           : null;
     }
+
     await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
