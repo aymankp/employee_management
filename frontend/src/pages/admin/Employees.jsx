@@ -59,6 +59,7 @@ export default function Employees() {
     joiningDate: "",
     employmentType: "permanent",
     isActive: true,
+    reportingTo: "",
   });
 
   useEffect(() => {
@@ -186,9 +187,18 @@ export default function Employees() {
         employmentDetails: {
           designation: formData.designation,
           employmentType: formData.employmentType,
-          joiningDate: formData.joiningDate, 
+          joiningDate: formData.joiningDate,
+          reportingTo: formData.reportingTo || null,
         },
       });
+
+      // 🔥 ADD THIS
+      if (formData.reportingTo) {
+        await api.put("/admin/assign-manager", {
+          employeeId: selectedEmployee._id,
+          managerId: formData.reportingTo,
+        });
+      }
 
       showMessage("success", "Employee updated successfully");
       setShowEditModal(false);
@@ -290,6 +300,7 @@ export default function Employees() {
       joiningDate: emp.employmentDetails?.joiningDate?.split("T")[0] || "",
       employmentType: emp.employmentDetails?.employmentType || "permanent",
       isActive: emp.isActive,
+      reportingTo: emp.employmentDetails?.reportingTo?._id || "",
     });
     setShowEditModal(true);
   };
@@ -553,6 +564,7 @@ export default function Employees() {
                   <th>Contact</th>
                   <th>Role & Team</th>
                   <th>Employment</th>
+                  <th>Manager</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -605,6 +617,14 @@ export default function Employees() {
                         </div>
                       </div>
                     </td>
+
+                    {/* 🔥 ADD THIS (Manager column) */}
+                    <td>
+                      {emp.employmentDetails?.reportingTo
+                        ? emp.employmentDetails.reportingTo.name
+                        : "—"}
+                    </td>
+
                     <td>{getStatusBadge(emp.isActive)}</td>
                     <td>
                       <div className="action-buttons">
@@ -920,7 +940,36 @@ export default function Employees() {
                     className="form-control"
                   />
                 </div>
+                {formData.role === "employee" && (
+                  <div className="form-group">
+                    <label>Assign Manager</label>
 
+                    <select
+                      value={formData.reportingTo || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          reportingTo: e.target.value,
+                        })
+                      }
+                      className="form-control"
+                    >
+                      <option value="">No Manager</option>
+
+                      {employees
+                        .filter(
+                          (e) =>
+                            e.role === "manager" &&
+                            e._id !== selectedEmployee?._id,
+                        )
+                        .map((manager) => (
+                          <option key={manager._id} value={manager._id}>
+                            {manager.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Joining Date</label>
                   <input
