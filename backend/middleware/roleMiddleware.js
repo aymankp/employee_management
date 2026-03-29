@@ -18,5 +18,12 @@ const isAdmin = (req, res, next) => {
     });
   }
 };
+const isManagerOrAdmin = (req, res, next) => {
+  if (req.user.role === 'manager' || req.user.role === 'admin') {
+    return next();
+  }
+  return res.status(403).json({ message: 'Access denied' });
+};
 
-module.exports = { isManager, isAdmin };
+module.exports = { isManager, isAdmin, isManagerOrAdmin };
+

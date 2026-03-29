@@ -55,9 +55,7 @@ const checkIn = async (req, res) => {
 // @route   PUT /api/attendance/checkout
 // @access  Private
 const checkOut = async (req, res) => {
-  const OFFICE_START = 9;   // 9 AM
-  const HALF_DAY_HOURS = 4;
-  const FULL_DAY_HOURS = 8;
+
   try {
     const { notes } = req.body || {};
     const today = new Date();
@@ -88,16 +86,20 @@ const checkOut = async (req, res) => {
 
     attendance.checkOut = new Date();
     attendance.notes = notes || attendance.notes;
-
     await attendance.save();
+    console.log("Work hours:", attendance.workHours);
 
     res.json({
       success: true,
       message: 'Check-out successful',
-      attendance: {
-        ...attendance.toObject(),
+      status: {
+        checkedIn: true,
+        checkedOut: true,
+        checkInTime: attendance.checkIn,
+        checkOutTime: attendance.checkOut,
         workHours: attendance.workHours,
-        overtime: attendance.overtime
+        overtime: attendance.overtime,
+        location: attendance.location
       }
     });
   } catch (error) {
@@ -124,7 +126,6 @@ const getTodayStatus = async (req, res) => {
         $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
       }
     });
-
     res.json({
       success: true,
       status: attendance ? {
@@ -133,7 +134,12 @@ const getTodayStatus = async (req, res) => {
         checkInTime: attendance.checkIn,
         checkOutTime: attendance.checkOut,
         workHours: attendance.workHours,
-        location: attendance.location
+        location: attendance.location,
+
+        // ✅ NEW
+        early: attendance.early,
+        late: attendance.late
+
       } : {
         checkedIn: false,
         message: 'Not checked in yet'
@@ -268,14 +274,16 @@ const getTeamAttendance = async (req, res) => {
 
     let filter = {};
 
-    // If manager, only show their team
+    // Manager → only team
     if (req.user.role === 'manager') {
       filter.team = req.user.team;
-    } else if (team) {
+    }
+    // Admin → optional filter
+    else if (team) {
       filter.team = team;
     }
 
-    const employees = await User.find(filter).select('_id name email employeeId team');
+    const employees = await User.find(filter).select('_id name email employeeId team employmentDetails');
 
     const attendance = await Attendance.find({
       employee: { $in: employees.map(e => e._id) },
@@ -285,24 +293,49 @@ const getTeamAttendance = async (req, res) => {
       }
     });
 
-    // Merge employee data with attendance
+    // Merge
     const result = employees.map(emp => {
       const record = attendance.find(a => a.employee.toString() === emp._id.toString());
+
       return {
         employee: emp,
-        attendance: record || { status: 'absent' }
+        attendance: record || null
       };
     });
 
+    // 🔥 NEW CALCULATIONS
+    const present = result.filter(
+      r => r.attendance && (r.attendance.status === 'present' || r.attendance.status === 'half-day')
+    ).length;
+
+    const halfDay = result.filter(
+      r => r.attendance && r.attendance.status === 'half-day'
+    ).length;
+
+    const absent = result.filter(
+      r => !r.attendance
+    ).length;
+
+    const late = result.filter(
+      r => r.attendance && r.attendance.late === true
+    ).length;
+
+    const onTime = result.filter(
+      r => r.attendance && r.attendance.checkIn && !r.attendance.late
+    ).length;
     res.json({
       success: true,
       date: queryDate,
       team: team || req.user.team,
       total: result.length,
-      present: result.filter(r => r.attendance.status === 'present').length,
-      absent: result.filter(r => r.attendance.status === 'absent' && !r.attendance._id).length,
+      present,
+      absent,
+      halfDay,
+      late,
+      onTime,
       data: result
     });
+
   } catch (error) {
     console.error('Team attendance error:', error);
     res.status(500).json({

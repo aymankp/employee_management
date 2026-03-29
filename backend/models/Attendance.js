@@ -46,6 +46,10 @@ const attendanceSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  early: {
+    type: Boolean,
+    default: false
+  },
 
   location: {
     type: String,
@@ -88,17 +92,21 @@ attendanceSchema.virtual('duration').get(function () {
 });
 
 // Pre-save to calculate work hours
+const HALF_DAY_HOURS = 4;
+const FULL_DAY_HOURS = 8;
+const OFFICE_START = 9;
+
 attendanceSchema.pre('save', function (next) {
   if (this.checkOut && this.checkIn) {
 
-    const diff = (this.checkOut - this.checkIn) / (1000 * 60 * 60);
-    this.workHours = Math.round(diff * 100) / 100;
+    const diff = (this.checkOut - this.checkIn) / 3600000;
+    this.workHours = Number(diff.toFixed(2));
 
-    // ---- Status rules ----
-    if (this.workHours < 1) {
+    // ---- Status ----
+    if (this.workHours === 0) {
       this.status = "absent";
     }
-    else if (this.workHours < 4) {
+    else if (this.workHours < HALF_DAY_HOURS) {
       this.status = "half-day";
     }
     else {
@@ -106,23 +114,33 @@ attendanceSchema.pre('save', function (next) {
     }
 
     // ---- Overtime ----
-    if (this.workHours > 8) {
-      this.overtime = Math.round((this.workHours - 8) * 100) / 100;
+    if (this.workHours > FULL_DAY_HOURS) {
+      this.overtime = Number((this.workHours - FULL_DAY_HOURS).toFixed(2));
     } else {
       this.overtime = 0;
     }
 
-    // ---- Late check ----
+    // ---- Early & Late ----
+    this.late = false;
+    this.early = false;
+
     const checkInHour = new Date(this.checkIn).getHours();
     const checkInMin = new Date(this.checkIn).getMinutes();
 
-    if (checkInHour > 9 || (checkInHour === 9 && checkInMin > 15)) {
-      this.late = true;
+    // Early (before 9:00)
+    if (checkInHour < OFFICE_START) {
+      this.early = true;
     }
 
+    // Late (after 9:15)
+    if (
+      checkInHour > OFFICE_START ||
+      (checkInHour === OFFICE_START && checkInMin > 15)
+    ) {
+      this.late = true;
+    }
   }
 
   next();
 });
-
 module.exports = mongoose.model('Attendance', attendanceSchema);
