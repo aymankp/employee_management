@@ -146,7 +146,7 @@ export default function Attendance() {
         text: "Check-in successful! Have a great day!",
       });
 
-      fetchTodayStatus();
+      // fetchTodayStatus();
       fetchAttendanceHistory();
     } catch (error) {
       setMessage({
@@ -163,17 +163,18 @@ export default function Attendance() {
     setMessage({ type: "", text: "" });
 
     try {
-      await api.put("/attendance/checkout", {
+      const res = await api.put("/attendance/checkout", {
         notes: "",
       });
+
+      setTodayStatus(res.data.status); // ✅ now works
 
       setMessage({
         type: "success",
         text: "Check-out successful! Goodbye!",
       });
 
-      fetchTodayStatus();
-      fetchAttendanceHistory();
+      fetchAttendanceHistory(); // optional now
     } catch (error) {
       setMessage({
         type: "error",
@@ -266,6 +267,19 @@ export default function Attendance() {
 
                 <p>Checked in at {formatTime(todayStatus.checkInTime)}</p>
 
+                {/* ✅ NEW STATUS */}
+                {todayStatus?.early && (
+                  <p className="status-early">🟢 Early Check-in</p>
+                )}
+
+                {todayStatus?.late && (
+                  <p className="status-late">🔴 Late Check-in</p>
+                )}
+
+                {!todayStatus?.early && !todayStatus?.late && (
+                  <p className="status-normal">🟡 On Time</p>
+                )}
+
                 {liveHours > 0 && (
                   <p className="hours">
                     Working for: {formatLiveHours(liveHours)}
@@ -294,15 +308,14 @@ export default function Attendance() {
               <div className="status-message completed">
                 <LogOut size={48} />
                 <h3>Completed</h3>
+                {todayStatus?.early && <p>🟢 Early</p>}
+                {todayStatus?.late && <p>🔴 Late</p>}
                 <p>Checked out at {formatTime(todayStatus.checkOutTime)}</p>
                 <p className="hours">
                   Total:{" "}
-                  {liveHours > 0 && (
-                    <p className="hours">
-                      Working for: {formatLiveHours(liveHours)}
-                    </p>
-                  )}{" "}
-                  hours
+                  {todayStatus?.workHours
+                    ? `${todayStatus.workHours} hrs`
+                    : formatLiveHours(liveHours)}
                 </p>
               </div>
             )}

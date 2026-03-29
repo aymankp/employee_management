@@ -1,7 +1,6 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-
 // Auth Pages
 import Login from './pages/auth/Login';
 
@@ -29,6 +28,7 @@ import Employees from './pages/admin/Employees';
 import Departments from './pages/admin/Departments';
 import Settings from './pages/admin/Settings';
 import EmployeeDetails from "./pages/admin/EmployeeDetails";
+import AdminAttendance from './pages/admin/attendance';
 
 
 const LoadingSpinner = () => (
@@ -133,6 +133,7 @@ function AppRoutes() {
         <Route path="departments" element={<Departments />} />
         <Route path="all-leaves" element={<LeaveHistory />} />
         <Route path="all-documents" element={<Documents />} />
+        <Route path="attendance" element={<AdminAttendance />} />
         <Route path="settings" element={<Settings />} />
         <Route path="employees/:id" element={<EmployeeDetails />} />
         <Route path="profile" element={<Profile />} />

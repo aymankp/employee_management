@@ -47,6 +47,7 @@ const Sidebar = () => {
         { path: "/admin/departments", label: "Departments", icon: Briefcase },
         { path: "/admin/all-leaves", label: "All Leaves", icon: CalendarDays },
         { path: "/admin/all-documents", label: "All Documents", icon: FolderOpen },
+         { path: "/admin/attendance", label: "Attendance", icon: Clock },
         { path: "/admin/settings", label: "Settings", icon: Settings },
       ]
     };
