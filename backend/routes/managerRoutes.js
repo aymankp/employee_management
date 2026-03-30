@@ -1,65 +1,58 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+
 const {
   getManagerProfile,
   updateManagerProfile,
   uploadManagerAvatar,
   getTeamMembers,
   getTeamMemberDetails,
-  getTeamStats,
-  getTeamEmployees  
+  getTeamStats
 } = require('../controllers/managerController.js');
 
-// Import both protect and authorize
+const attendanceController = require('../controllers/attendanceController');
+
 const { protect, authorize } = require('../middleware/authMiddleware.js');
 
-// Configure multer for file upload
+const router = express.Router();
+
+// Apply auth globally
+router.use(protect);
+
+// Multer config
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
+  destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, 'manager-avatar-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
+    const allowed = /jpeg|jpg|png|gif/;
+    if (allowed.test(file.mimetype) && allowed.test(path.extname(file.originalname).toLowerCase())) {
+      cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image files allowed'));
     }
   }
 });
 
-const router = express.Router();
-
-// Apply protect middleware to all routes first
-router.use(protect);
-
-// Profile routes - only accessible by managers and admins
-router.get('/me', protect, authorize('manager', 'admin'), getManagerProfile);
+// PROFILE
+router.get('/me', authorize('manager', 'admin'), getManagerProfile);
 router.put('/me', authorize('manager', 'admin'), updateManagerProfile);
 router.put('/me/avatar', authorize('manager', 'admin'), upload.single('avatar'), uploadManagerAvatar);
 
-
-// IMPORTANT: Team employees endpoint 
-router.get('/employees/team', authorize('manager', 'admin'), getTeamEmployees);
-router.get('/team/members', authorize('manager', 'admin'), getTeamEmployees); // Backup
-router.get('/team/list', authorize('manager', 'admin'), getTeamEmployees);    // Backup
-
-// Team routes - only accessible by managers and admins
+// TEAM
 router.get('/team', authorize('manager', 'admin'), getTeamMembers);
 router.get('/team/stats', authorize('manager', 'admin'), getTeamStats);
 router.get('/team/:employeeId', authorize('manager', 'admin'), getTeamMemberDetails);
+
+// 🔥 ATTENDANCE (NEW)
+router.get('/team/attendance', authorize('manager', 'admin'), attendanceController.getTeamAttendance);
 
 module.exports = router;

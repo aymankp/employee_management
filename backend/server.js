@@ -23,7 +23,6 @@ const reportRoutes = require("./routes/reportRoutes");
 const { onlineUsers } = require("./socketStore");
 const User = require("./models/User");
 
-
 connectDB();
 
 const app = express();
