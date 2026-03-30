@@ -38,6 +38,7 @@ const Sidebar = () => {
         { path: "/employee/documents", label: "Documents", icon: FolderOpen },
       ],
       manager: [
+         { path: "/manager/attendance", label: "Attendance", icon: Clock },
         { path: "/manager/team-leaves", label: "Team Leaves", icon: CalendarDays },
         { path: "/manager/team-documents", label: "Team Documents", icon: FolderOpen },
         { path: "/manager/reports", label: "Reports", icon: BarChart3 },

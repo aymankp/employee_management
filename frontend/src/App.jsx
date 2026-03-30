@@ -1,6 +1,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+
 // Auth Pages
 import Login from './pages/auth/Login';
 
@@ -21,7 +22,7 @@ import TeamLeaves from './pages/manager/TeamLeaves';
 import TeamDocuments from './pages/manager/TeamDocuments';
 import Reports from './pages/manager/Reports';
 import ManagerProfile from './pages/manager/Profile';
-
+import ManagerAttendance from './pages/manager/ManagerAttendance';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Employees from './pages/admin/Employees';
@@ -117,6 +118,7 @@ function AppRoutes() {
         <Route path="team-documents" element={<TeamDocuments />} />
         <Route path="reports" element={<Reports />} />
         <Route path="profile" element={<ManagerProfile />} />
+        <Route path="attendance" element={<ManagerAttendance />} />
       </Route>
 
       {/* ADMIN */}
