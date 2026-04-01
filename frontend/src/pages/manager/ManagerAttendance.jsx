@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { 
-  Users, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Calendar, 
-  Download, 
+import {
+  Users,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Calendar,
+  Download,
   RefreshCw,
   Search,
   Filter,
@@ -13,7 +13,7 @@ import {
   ChevronUp,
   TrendingUp,
   AlertCircle,
-  Briefcase
+  Briefcase,
 } from "lucide-react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
@@ -27,9 +27,12 @@ export default function ManagerAttendance() {
   const [sortField, setSortField] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [teamInfo, setTeamInfo] = useState({
     teamName: "",
-    memberCount: 0
+    memberCount: 0,
   });
   const [stats, setStats] = useState({
     total: 0,
@@ -38,19 +41,19 @@ export default function ManagerAttendance() {
     halfDay: 0,
     attendanceRate: 0,
     onTime: 0,
-    late: 0
+    late: 0,
   });
 
   useEffect(() => {
     fetchTeamAttendance();
-  }, []);
+  }, [selectedDate]);
 
   const fetchTeamAttendance = async () => {
     setLoading(true);
     try {
       // Get team attendance data (only manager's team)
-      const res = await api.get("/attendance/team");
-      
+      const res = await api.get(`/attendance/team?date=${selectedDate}`);
+
       // Handle different response structures
       const attendanceData = res.data?.data || res.data || [];
       const totalCount = res.data?.total || attendanceData.length;
@@ -59,24 +62,24 @@ export default function ManagerAttendance() {
       const halfDayCount = res.data?.halfDay || 0;
       const onTimeCount = res.data?.onTime || 0;
       const lateCount = res.data?.late || 0;
-      
+
       setData(attendanceData);
-      
+
       setTeamInfo({
         teamName: user?.team || "Your Team",
-        memberCount: totalCount
+        memberCount: totalCount,
       });
-      
+
       setStats({
         total: totalCount,
         present: presentCount,
         absent: absentCount,
         halfDay: halfDayCount,
-        attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0,
+        attendanceRate:
+          totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0,
         onTime: onTimeCount,
-        late: lateCount
+        late: lateCount,
       });
-      
     } catch (error) {
       console.error("Error fetching team attendance:", error);
     } finally {
@@ -95,15 +98,21 @@ export default function ManagerAttendance() {
 
   const getSortIcon = (field) => {
     if (sortField !== field) return null;
-    return sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+    return sortOrder === "asc" ? (
+      <ChevronUp size={14} />
+    ) : (
+      <ChevronDown size={14} />
+    );
   };
 
-  const filteredData = data.filter(emp => {
+  const filteredData = data.filter((emp) => {
     const employee = emp.employee || emp;
-    const matchesSearch = employee?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          employee?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      employee?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee?.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const attendance = emp.attendance || emp;
-    const matchesStatus = filterStatus === "all" || attendance?.status === filterStatus;
+    const matchesStatus =
+      filterStatus === "all" || attendance?.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -112,9 +121,9 @@ export default function ManagerAttendance() {
     const empB = b.employee || b;
     const attA = a.attendance || a;
     const attB = b.attendance || b;
-    
+
     let aVal, bVal;
-    switch(sortField) {
+    switch (sortField) {
       case "name":
         aVal = empA?.name || "";
         bVal = empB?.name || "";
@@ -135,19 +144,31 @@ export default function ManagerAttendance() {
         aVal = empA?.name || "";
         bVal = empB?.name || "";
     }
-    
+
     if (sortOrder === "asc") return aVal > bVal ? 1 : -1;
     return aVal < bVal ? 1 : -1;
   });
 
   const getStatusBadge = (status) => {
-    switch(status) {
+    switch (status) {
       case "present":
-        return <span className="status-badge present"><CheckCircle size={12} /> Present</span>;
+        return (
+          <span className="status-badge present">
+            <CheckCircle size={12} /> Present
+          </span>
+        );
       case "absent":
-        return <span className="status-badge absent"><XCircle size={12} /> Absent</span>;
+        return (
+          <span className="status-badge absent">
+            <XCircle size={12} /> Absent
+          </span>
+        );
       case "half-day":
-        return <span className="status-badge half-day"><Clock size={12} /> Half Day</span>;
+        return (
+          <span className="status-badge half-day">
+            <Clock size={12} /> Half Day
+          </span>
+        );
       default:
         return <span className="status-badge unknown">Unknown</span>;
     }
@@ -155,43 +176,126 @@ export default function ManagerAttendance() {
 
   const formatTime = (time) => {
     if (!time) return "-";
-    return new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(time).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const formatDate = () => {
-    return new Date().toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return new Date(selectedDate).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
-  const handleExport = () => {
-    const headers = ["Employee", "Email", "Check In", "Check Out", "Work Hours", "Status"];
-    const rows = sortedData.map(item => {
-      const emp = item.employee || item;
-      const att = item.attendance || item;
-      return [
-        emp?.name || "",
-        emp?.email || "",
-        formatTime(att?.checkIn),
-        formatTime(att?.checkOut),
-        att?.workHours || 0,
-        att?.status || "absent"
-      ];
-    });
-    
-    const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `team_attendance_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // const handleExport = () => {
+  //   const headers = [
+  //     "Employee",
+  //     "Email",
+  //     "Check In",
+  //     "Check Out",
+  //     "Work Hours",
+  //     "Status",
+  //   ];
+  //   const rows = sortedData.map((item) => {
+  //     const emp = item.employee || item;
+  //     const att = item.attendance || item;
+  //     return [
+  //       emp?.name || "",
+  //       emp?.email || "",
+  //       formatTime(att?.checkIn),
+  //       formatTime(att?.checkOut),
+  //       att?.workHours || 0,
+  //       att?.status || "absent",
+  //     ];
+  //   });
 
+  //   const csvContent = [headers, ...rows]
+  //     .map((row) => row.join(","))
+  //     .join("\n");
+  //   const blob = new Blob([csvContent], { type: "text/csv" });
+  //   const url = URL.createObjectURL(blob);
+  //   const a = document.createElement("a");
+  //   a.href = url;
+  //   a.download = `team_attendance_${new Date().toISOString().split("T")[0]}.csv`;
+  //   a.click();
+  //   URL.revokeObjectURL(url);
+  // };
+  const handleExportMonth = async () => {
+    try {
+      const date = new Date(selectedDate);
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+
+      const res = await api.get(
+        `/attendance/team/month?month=${month}&year=${year}`,
+      );
+
+      const { employees, attendance } = res.data;
+      const formatLocalDate = (d) => {
+        const date = new Date(d);
+        return `${date.getFullYear()}-${(date.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
+      };
+      // Create map: employeeId + date → record
+      const map = {};
+      attendance.forEach((a) => {
+        const key = `${a.employee.toString()}_${formatLocalDate(a.date)}`;
+        map[key] = a;
+      });
+      // 🔥 ADD THIS HERE
+      rows.sort((a, b) => new Date(a[0]) - new Date(b[0]));
+      // Get all dates of month
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const dates = Array.from(
+        { length: daysInMonth },
+        (_, i) =>
+          `${year}-${month.toString().padStart(2, "0")}-${(i + 1)
+            .toString()
+            .padStart(2, "0")}`,
+      );
+
+      // Headers
+      // ✅ NEW DATE-WISE FORMAT
+
+      const headers = ["Date", "Employee", "Email", "Status", "Work Hours"];
+      const rows = [];
+
+      // Loop date first
+      dates.forEach((date) => {
+        employees.forEach((emp) => {
+          const key = `${emp._id.toString()}_${date}`;
+          const record = map[key];
+
+          rows.push([
+            date,
+            emp.name,
+            emp.email,
+            record ? record.status : "absent",
+            record ? record.workHours : 0,
+          ]);
+        });
+      });
+
+      const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attendance_${month}_${year}.csv`;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export error:", err);
+    }
+  };
   if (loading) {
     return (
       <div className="manager-attendance loading">
@@ -209,13 +313,19 @@ export default function ManagerAttendance() {
           <p className="page-subtitle">Track your team's daily attendance</p>
         </div>
         <div className="header-actions">
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="date-input"
+          />
           <button className="btn btn-outline" onClick={fetchTeamAttendance}>
             <RefreshCw size={16} />
             Refresh
           </button>
-          <button className="btn btn-outline" onClick={handleExport}>
+          <button className="btn btn-outline" onClick={handleExportMonth}>
             <Download size={16} />
-            Export
+            Export Month
           </button>
         </div>
       </div>
@@ -255,7 +365,9 @@ export default function ManagerAttendance() {
           <div className="stat-content">
             <span className="stat-label">Present Today</span>
             <span className="stat-value">{stats.present}</span>
-            <span className="stat-trend">{stats.attendanceRate}% attendance</span>
+            <span className="stat-trend">
+              {stats.attendanceRate}% attendance
+            </span>
           </div>
         </div>
 
@@ -294,14 +406,24 @@ export default function ManagerAttendance() {
                 <span className="label">On Time</span>
                 <span className="value">{stats.onTime}</span>
                 <div className="progress-bar">
-                  <div className="progress-fill on-time" style={{ width: `${(stats.onTime / stats.present) * 100 || 0}%` }}></div>
+                  <div
+                    className="progress-fill on-time"
+                    style={{
+                      width: `${(stats.onTime / stats.present) * 100 || 0}%`,
+                    }}
+                  ></div>
                 </div>
               </div>
               <div className="punctuality-item">
                 <span className="label">Late Arrival</span>
                 <span className="value">{stats.late}</span>
                 <div className="progress-bar">
-                  <div className="progress-fill late" style={{ width: `${(stats.late / stats.present) * 100 || 0}%` }}></div>
+                  <div
+                    className="progress-fill late"
+                    style={{
+                      width: `${(stats.late / stats.present) * 100 || 0}%`,
+                    }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -325,7 +447,7 @@ export default function ManagerAttendance() {
             />
           </div>
 
-          <select 
+          <select
             className="filter-select"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}

@@ -18,14 +18,15 @@ import {
   TrendingUp,
 } from "lucide-react";
 import "../employee/Profile.css";
-
 export default function ManagerProfile() {
+  const [errors, setErrors] = useState({});
   const { user: authUser, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [passwordMode, setPasswordMode] = useState(false);
   const [formData, setFormData] = useState({});
+
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -151,54 +152,53 @@ export default function ManagerProfile() {
       URL.revokeObjectURL(previewUrl);
     }
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // ✅ Frontend Validation
+    const phoneRegex = /^\d{10}$/;
+
+    if (!phoneRegex.test(formData.phone)) {
+      return showMessage("error", "Phone number must be 10 digits");
+    }
+
+    if (formData.emergencyPhone && !phoneRegex.test(formData.emergencyPhone)) {
+      return showMessage("error", "Emergency phone must be 10 digits");
+    }
+
     try {
-      // Try manager endpoint first
+      const payload = {
+        name: formData.name,
+        personalInfo: {
+          phone: formData.phone,
+          bloodGroup: formData.bloodGroup,
+          dateOfBirth: formData.dateOfBirth,
+        },
+        address: {
+          current: {
+            street: formData.address,
+            city: formData.city,
+            state: formData.state,
+            pincode: formData.pincode,
+          },
+        },
+        emergencyContact: {
+          name: formData.emergencyContact,
+          phone: formData.emergencyPhone,
+        },
+      };
+
+      // 🚀 Try manager first
       try {
-        await api.put("/managers/me", {
-          name: formData.name,
-          personalInfo: {
-            phone: formData.phone,
-            bloodGroup: formData.bloodGroup,
-            dateOfBirth: formData.dateOfBirth,
-          },
-          address: {
-            current: {
-              street: formData.address,
-              city: formData.city,
-              state: formData.state,
-              pincode: formData.pincode,
-            },
-          },
-          emergencyContact: {
-            name: formData.emergencyContact,
-            phone: formData.emergencyPhone,
-          },
-        });
-      } catch {
-        // Fallback to employee endpoint
-        await api.put("/employees/me", {
-          name: formData.name,
-          personalInfo: {
-            phone: formData.phone,
-            bloodGroup: formData.bloodGroup,
-            dateOfBirth: formData.dateOfBirth,
-          },
-          address: {
-            current: {
-              street: formData.address,
-              city: formData.city,
-              state: formData.state,
-              pincode: formData.pincode,
-            },
-          },
-          emergencyContact: {
-            name: formData.emergencyContact,
-            phone: formData.emergencyPhone,
-          },
-        });
+        await api.put("/managers/me", payload);
+      } catch (err) {
+        // ⚠️ Only fallback if 404/403 (not validation error)
+        if (err.response?.status === 404 || err.response?.status === 403) {
+          await api.put("/employees/me", payload);
+        } else {
+          throw err; // ❌ real error → bubble up
+        }
       }
 
       showMessage("success", "Profile updated successfully!");
@@ -507,10 +507,37 @@ export default function ManagerProfile() {
                       type="tel"
                       name="phone"
                       value={formData.phone}
-                      onChange={handleInputChange}
-                      className="form-control"
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        // only digits allow
+                        if (!/^\d*$/.test(value)) return;
+
+                        setFormData({ ...formData, phone: value });
+
+                        // validation
+                        if (value.length !== 10) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            phone: "Phone must be 10 digits",
+                          }));
+                        } else {
+                          setErrors((prev) => ({
+                            ...prev,
+                            phone: "",
+                          }));
+                        }
+                      }}
+                      className={`form-control ${
+                        errors.phone ? "border-red-500" : ""
+                      }`}
                       placeholder="Enter phone number"
                     />
+                    {errors.phone && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.phone}
+                      </p>
+                    )}
                   </div>
                   <div className="form-group">
                     <label>Date of Birth</label>
@@ -597,12 +624,33 @@ export default function ManagerProfile() {
                   <div className="form-group">
                     <label>Contact Name</label>
                     <input
-                      type="text"
-                      name="emergencyContact"
-                      value={formData.emergencyContact}
-                      onChange={handleInputChange}
-                      className="form-control"
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        // only digits allow
+                        if (!/^\d*$/.test(value)) return;
+
+                        setFormData({ ...formData, emergencyPhone: value });
+
+                        // validation
+                        if (value && value.length !== 10) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            emergencyPhone: "Emergency phone must be 10 digits",
+                          }));
+                        } else {
+                          setErrors((prev) => ({
+                            ...prev,
+                            emergencyPhone: "",
+                          }));
+                        }
+                      }}
                     />
+                    {errors.emergencyPhone && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.emergencyPhone}
+                      </p>
+                    )}
                   </div>
                   <div className="form-group">
                     <label>Contact Phone</label>
