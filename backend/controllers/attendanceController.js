@@ -192,12 +192,12 @@ const getMyAttendance = async (req, res) => {
 
     if (month && year) {
       startDate = new Date(year, month - 1, 1);
-      endDate = new Date(year, month, 0, 23, 59, 59);
+      endDate = new Date(year, month, 1);
     } else {
       // Default to current month
       const now = new Date();
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      endDate = endDate = new Date(year, month, 1);
     }
 
     const attendance = await Attendance.find({
@@ -272,18 +272,23 @@ const getTeamAttendance = async (req, res) => {
     const queryDate = date ? new Date(date) : new Date();
     queryDate.setHours(0, 0, 0, 0);
 
-    let filter = {};
+    let employees = [];
 
-    // Manager → only team
+    // Manager → get only assigned employees
     if (req.user.role === 'manager') {
-      filter.team = req.user.team;
-    }
-    // Admin → optional filter
-    else if (team) {
-      filter.team = team;
+      employees = await User.find({
+        "employmentDetails.reportingTo": req.user._id
+      }).select('_id name email employeeId team employmentDetails');
     }
 
-    const employees = await User.find(filter).select('_id name email employeeId team employmentDetails');
+    // Admin → optional team filter
+    else {
+      let filter = {};
+      if (team) filter.team = team;
+
+      employees = await User.find(filter)
+        .select('_id name email employeeId team employmentDetails');
+    }
 
     const attendance = await Attendance.find({
       employee: { $in: employees.map(e => e._id) },
@@ -299,7 +304,11 @@ const getTeamAttendance = async (req, res) => {
 
       return {
         employee: emp,
-        attendance: record || null
+        attendance: record || {
+          status: "absent",
+          workHours: 0,
+          late: false
+        }
       };
     });
 
@@ -313,7 +322,7 @@ const getTeamAttendance = async (req, res) => {
     ).length;
 
     const absent = result.filter(
-      r => !r.attendance
+      r => r.attendance.status === 'absent'
     ).length;
 
     const late = result.filter(
@@ -417,7 +426,35 @@ const getAttendanceReport = async (req, res) => {
     });
   }
 };
+const getMonthlyTeamAttendance = async (req, res) => {
+  try {
+    const { month, year } = req.query;
 
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    // Get team employees
+    const employees = await User.find({
+      "employmentDetails.reportingTo": req.user._id
+    }).select('_id name email');
+
+    const employeeIds = employees.map(e => e._id);
+
+    // Get attendance records for full month
+    const attendance = await Attendance.find({
+      employee: { $in: employeeIds },
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    res.json({
+      employees,
+      attendance
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 // @desc    Manual Attendance Entry (Admin only)
 // @route   POST /api/attendance/manual
 // @access  Admin
@@ -485,5 +522,6 @@ module.exports = {
   getTeamAttendance,
   getAttendanceReport,
   manualAttendance,
-  getTodayAttendanceSummary
+  getTodayAttendanceSummary,
+  getMonthlyTeamAttendance
 };
